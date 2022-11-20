@@ -74,7 +74,7 @@ output: word_document
 ```{r}
 rm(list = ls())
 data = data.frame()
-data_2015 = read.csv("2015-tripdata.csv")
+data_2015 = read.csv("TripData/2015-tripdata.csv")
 data = rbind(data, data_2015)
 data_2016 = read.csv("2016-tripdata.csv")
 data = rbind(data, data_2016)

@@ -1,0 +1,12 @@
+---
+title: "LinearModel"
+output: html_document
+date: "2022-11-20"
+---
+
+```{r}
+data
+lm.fit = lm(data = data, data$totalTrips ~ data$temp + data$totalCrimes)
+summary(lm.fit)
+```
+
