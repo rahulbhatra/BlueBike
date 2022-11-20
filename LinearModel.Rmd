@@ -5,8 +5,30 @@ date: "2022-11-20"
 ---
 
 ```{r}
-data
-lm.fit = lm(data = data, data$totalTrips ~ data$temp + data$totalCrimes)
+head(data)
+
+trainIndex <- c(seq(1, 0.8*nrow(data)))
+testIndex <- c(seq(0.8*nrow(data) + 1, nrow(data)))
+
+train  <- data[trainIndex, ]
+test   <- data[testIndex, ]
+
+lm.fit = lm(data = train, totalTrips ~ temp + totalCrimes + humidity + snow + windspeed + visibility)
 summary(lm.fit)
+```
+
+```{r}
+library("ggplot2")
+lm.predict = predict(lm.fit, newdata = test)
+lm.predict
+
+plot = data.frame(test$startDate, test$totalTrips, lm.predict)
+plot
+
+head(plot)
+ggp = ggplot(data = plot) + 
+  geom_line(aes(x = test.startDate, y = test.totalTrips), color = 'red') + 
+  geom_line(aes(x = test.startDate, y = lm.predict), color = 'green')
+ggp
 ```
 
