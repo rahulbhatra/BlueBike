@@ -1,0 +1,122 @@
+---
+title: "Project"
+output: word_document
+---
+
+# ```{r}
+# rm(list = ls())
+# 
+# getData = function(name) {
+#   print(name)
+#   url = paste("https://s3.amazonaws.com/hubway-data/", name, ".zip", sep = "")
+#   url
+#   zip = paste(name, ".zip", sep = "")
+#   print(zip)
+#   download.file(url, zip)
+#   csv = unzip(zip)
+#   if (length(csv) > 1) {
+#     csv = csv[1]
+#   }
+#   returnValue(read.csv(csv, header=T, sep=",") )
+# }
+# ```
+# 
+# 
+# ```{r}
+# today = Sys.Date()
+# month_today = as.numeric(format(today, "%m"))
+# year_today = as.numeric(format(today, "%Y"))
+# 
+# data = data.frame()
+# 
+# for (year in 2018:2018) {
+#   for (month in 01:12) {
+#     if (year == 2018 && month >= 05) {
+#       break;
+#     }
+#     if (month < 10) {
+#       name = paste(year, 0, month, "-hubway-tripdata", sep = "")
+#     } else {
+#       name = paste(year, month, "-hubway-tripdata", sep = "")
+#     }
+#     month.data = getData(name)
+#     data = rbind(data, month.data)
+#     dim(data)
+#   }
+# }
+# 
+# for (year in 2022:2022) {
+#   for (month in 01:12) {
+#     if (year == 2018 && month < 05) {
+#       next;
+#     }
+#     if (year == year_today && month >= month_today) {
+#       break;
+#     }
+#     if (month < 10) {
+#       name = paste(year, 0, month, "-bluebikes-tripdata", sep = "") 
+#     } else {
+#       name = paste(year, month, "-bluebikes-tripdata", sep = "") 
+#     }
+#     month.data = getData(name)
+#     data = rbind(data, month.data)
+#     dim(data)
+#   }
+# }
+# ```
+# ```{r}
+# write.csv(data, file="2022-tripdata.csv")
+# dim(data)
+# summary(data)
+# data
+<!-- ``` -->
+
+```{r}
+rm(list = ls())
+data = data.frame()
+data_2015 = read.csv("2015-tripdata.csv")
+data = rbind(data, data_2015)
+data_2016 = read.csv("2016-tripdata.csv")
+data = rbind(data, data_2016)
+data_2017 = read.csv("2017-tripdata.csv")
+data = rbind(data, data_2017)
+data_2018 = read.csv("2018-tripdata.csv")
+data = rbind(data, data_2018)
+data_2019 = read.csv("2019-tripdata.csv")
+data_2020 = read.csv("2020-tripdata.csv")
+data_2021 = read.csv("2021-tripdata.csv")
+data_2022 = read.csv("2022-tripdata.csv")
+str(data)
+```
+
+```{r}
+tripData = data
+str(tripData)
+cat("Total Number of NA Values present in the data", sum(is.na(tripData)))
+```
+
+
+```{r}
+tripData$startDate = as.Date(tripData$starttime, "%Y-%m-%d")
+tripData$stopDate = as.Date(tripData$stoptime, "%Y-%m-%d")
+library(dplyr)
+numberOfTrips = tripData %>% group_by(startDate) %>% 
+  summarise(totalTrips=length(bikeid),
+            .groups = 'drop')
+numberOfTrips
+plot(x = numberOfTrips$startDate, y = numberOfTrips$totalTrips, xlab = "Month of the Year", ylab = "Total Number of Trips", type = "l", main = "2019 Date Vs Number of Trips")
+```
+
+
+```{r}
+library(caret)
+dim(numberOfTrips)
+index = createDataPartition(numberOfTrips$totalTrips, p = 0.8, list = FALSE)
+trainData = numberOfTrips[index, ]
+testData = numberOfTrips[-index, ]
+lm.fit = lm(totalTrips ~ ., trainData)
+summary(lm.fit)
+```
+
+
+
