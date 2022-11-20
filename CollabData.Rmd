@@ -1,22 +1,40 @@
+***We are Mergin the whole trip data into one big trip data over here from year 2015 - 2022***
 ```{r}
-tripData = read.csv("TripData/2019-tripdata.csv")
-tripData
+rm(list = ls())
+rows = c("tripduration", "starttime", "stoptime", "start.station.id", "start.station.name", "start.station.latitude", "start.station.longitude", "end.station.id", "end.station.name", "end.station.latitude", "end.station.longitude", "bikeid", "usertype")
+tripData = data.frame()
+tripData = rbind(tripData, read.csv("TripData/2015-tripdata.csv")[rows])
+tripData = rbind(tripData, read.csv("TripData/2016-tripdata.csv")[rows])
+tripData = rbind(tripData, read.csv("TripData/2017-tripdata.csv")[rows])
+tripData = rbind(tripData, read.csv("TripData/2018-tripdata.csv")[rows])
+tripData = rbind(tripData, read.csv("TripData/2019-tripdata.csv")[rows])
+tripData = rbind(tripData, read.csv("TripData/2020-tripdata.csv")[rows])
+tripData = rbind(tripData, read.csv("TripData/2021-tripdata.csv")[rows])
+tripData = rbind(tripData, read.csv("TripData/2022-tripdata.csv")[rows])
+head(tripData)
+```
+***Writing all data inside one huge file***
+```{r}
+write.csv(tripData, "TripData/tripdata.csv")
 ```
 
+
+***Counting number of trips by date***
 ```{r}
-tripData$startDate = as.Date(tripData$starttime, "%Y-%m-%d")
-tripData$stopDate = as.Date(tripData$stoptime, "%Y-%m-%d")
 library(dplyr)
-numberOfTrips = tripData %>% group_by(startDate) %>% 
+tripData$date = as.Date(tripData$starttime, "%Y-%m-%d")
+
+numberOfTrips = tripData %>% group_by(date) %>% 
   summarise(totalTrips=length(bikeid),
             .groups = 'drop')
 numberOfTrips
-plot(x = numberOfTrips$startDate, y = numberOfTrips$totalTrips, xlab = "Month of the Year", ylab = "Total Number of Trips", type = "l", main = "2019 Date Vs Number of Trips")
+plot(x = numberOfTrips$date, y = numberOfTrips$totalTrips, xlab = "Month of the Year", ylab = "Total Number of Trips", type = "l", main = "Date Vs Number of Trips")
 ```
 
 
 ```{r}
 crimeData = read.csv("CrimeData/crimeData.csv")
+head(crimeData)
 crimeData
 ```
 
@@ -27,37 +45,52 @@ crimeCount = crimeData %>% group_by(OCCURRED_ON_DATE) %>%
   summarise(totalCrimes=length(INCIDENT_NUMBER),
             .groups = 'drop')
 crimeData
-crimeCount = crimeCount[crimeCount$OCCURRED_ON_DATE >= as.Date("2019-01-01") & crimeCount$OCCURRED_ON_DATE <= as.Date("2019-12-31"), ]
+crimeCount = crimeCount[crimeCount$OCCURRED_ON_DATE >= as.Date("2015-01-01") & crimeCount$OCCURRED_ON_DATE <= as.Date("2022-12-31"), ]
 length(crimeCount$totalCrimes)
 length(crimeCount$OCCURRED_ON_DATE)
-plot(x = crimeCount$OCCURRED_ON_DATE, y = crimeCount$totalCrimes, xlab = "Month of the Year", ylab = "Total Number of Crimes", type = "l", main = "2019 Date Vs Number of Crimes")
+plot(x = crimeCount$OCCURRED_ON_DATE, y = crimeCount$totalCrimes, xlab = "Month of the Year", ylab = "Total Number of Crimes", type = "l", main = "Date Vs Number of Crimes")
 ```
 
-Combining the data
+***Combining the weather data***
 ```{r}
-weatherData = read.csv("WeatherData/Weather2019.csv")
+weatherData = data.frame()
+weatherData = rbind(weatherData, read.csv("WeatherData/Weather2015.csv"))
+weatherData = rbind(weatherData, read.csv("WeatherData/Weather2016.csv"))
+weatherData = rbind(weatherData, read.csv("WeatherData/Weather2017.csv"))
+weatherData = rbind(weatherData, read.csv("WeatherData/Weather2018.csv"))
+weatherData = rbind(weatherData, read.csv("WeatherData/Weather2019.csv"))
+weatherData = rbind(weatherData, read.csv("WeatherData/Weather2020.csv"))
+weatherData = rbind(weatherData, read.csv("WeatherData/Weather2021.csv"))
+weatherData = rbind(weatherData, read.csv("WeatherData/Weather2022.csv"))
+
 weatherData$datetime = as.Date(weatherData$datetime, "%Y-%m-%d")
-weatherData
+head(weatherData)
+```
+
+***Write the merged data into one big file. Now you can just get if from over here***
+```{r}
+write.csv(weatherData, "WeatherData/weather.csv")
 ```
 
 
 ```{r}
-data = merge(numberOfTrips, weatherData, by.x = "startDate", by.y ="datetime")
-data = merge(data, crimeCount, by.x = "startDate", by.y = "OCCURRED_ON_DATE")
+rm(data)
+data = merge(numberOfTrips, crimeCount, by.x = "date", by.y = "OCCURRED_ON_DATE")
+data = merge(data, weatherData, by.x = "date", by.y ="datetime")
 data
 ```
 
 
 ```{r}
-str(data)
 library("ggplot2")
+str(data)
 ggp = ggplot(data = data) +
-  geom_line(aes(x = startDate, y = totalTrips), color = 2) + 
+  geom_line(aes(x = date, y = totalTrips), color = 2)
 ggp
 
 ggplot(data = data) + 
-  geom_line(aes(x = startDate, y = totalCrimes), color = 3) +
-  geom_line(aes(x = startDate, y = temp), color = 4)
+  geom_line(aes(x = date, y = totalCrimes), color = 3) +
+  geom_line(aes(x = date, y = temp), color = 4)
 ```
 
 ```{r}

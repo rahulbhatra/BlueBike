@@ -22,13 +22,30 @@ library("ggplot2")
 lm.predict = predict(lm.fit, newdata = test)
 lm.predict
 
-plot = data.frame(test$startDate, test$totalTrips, lm.predict)
+plot = data.frame(test$date, test$totalTrips, lm.predict)
 plot
 
 head(plot)
 ggp = ggplot(data = plot) + 
-  geom_line(aes(x = test.startDate, y = test.totalTrips), color = 'red') + 
-  geom_line(aes(x = test.startDate, y = lm.predict), color = 'green')
+  geom_line(aes(x = test.date, y = test.totalTrips), color = 'red') + 
+  geom_line(aes(x = test.date, y = lm.predict), color = 'green')
 ggp
+```
+
+***As we are going to predict the next total trips. We will be working on time series data, for that we can't perform k - fold cross validation and temporal ordreing will be out of order.***
+```{r}
+library(tidyverse)
+library(lubridate)
+library(caret)
+library(doParallel)
+library(lattice)
+library(pdp)
+
+knitr::kable(head(data))
+knitr::kable(tail(data))
+```
+
+```{r}
+
 ```
 
