@@ -1,0 +1,43 @@
+---
+title: "GAM"
+output: html_document
+date: "2022-11-21"
+---
+
+```{r}
+library("mgcv")
+gam.fit = gam(totalTrips ~ temp + totalCrimes + humidity + snow + windspeed + visibility, data = train)
+summary(gam.fit)
+
+gam.fit.smoothing = gam(totalTrips ~ temp + totalCrimes + humidity + snow + windspeed + visibility, data = train)
+summary(gam.fit.smoothing)
+```
+
+```{r}
+gam.fit.sse =sum(fitted(gam.fit) - train$totalTrips)^2
+gam.fit.ssr =sum(fitted(gam.fit) -mean(train$totalTrips))^2
+gam.fit.rSquare = 1 - (gam.fit.sse /(gam.fit.ssr + gam.fit.sse))
+cat("The R square GAM is: %s", gam.fit.rSquare)
+
+gam.fit.smoothing.sse =sum(fitted(gam.fit.smoothing) - train$totalTrips)^2
+gam.fit.smoothing.ssr =sum(fitted(gam.fit.smoothing) -mean(train$totalTrips))^2
+gam.fit.smoothing.rSquare = 1 - (gam.fit.smoothing.sse /(gam.fit.smoothing.ssr + gam.fit.smoothing.sse))
+cat("The R square GAM is: %s", gam.fit.smoothing.rSquare)
+```
+
+
+```{r}
+library("ggplot2")
+predicted = predict(gam.fit, newdata = test)
+predicted
+
+plot = data.frame(test$date, test$totalTrips, predicted)
+plot
+
+head(plot)
+ggp = ggplot(data = plot) + 
+  geom_line(aes(x = test.date, y = test.totalTrips), color = 'red') + 
+  geom_line(aes(x = test.date, y = predicted), color = 'green')
+ggp
+```
+
