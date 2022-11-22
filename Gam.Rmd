@@ -12,6 +12,10 @@ testIndex <- c(seq(0.8*nrow(data) + 1, nrow(data)))
 
 train  <- data[trainIndex, ]
 test   <- data[testIndex, ]
+test.x = test[c("temp", "totalCrimes", "humidity", "windspeed", "visibility", "feelslike", "uvindex")]
+test.x
+newx = as.matrix(test.x)
+newx
 ```
 
 ```{r}
@@ -86,6 +90,53 @@ glmnet.mod <- train(totalTrips ~ temp + totalCrimes + humidity + windspeed + vis
                     metric='RMSE'
                 )
 summary(glmnet.mod)
+plot(glmnet.mod)
+glmnet.mod
+```
+***Testing the model (Regularized Linear Regression) and plotting it's results over here.***
+```{r}
+bestlam = glmnet.mod$bestTune$lambda
+bestlam
+glmnet.pred = predict(glmnet.mod$finalModel, s = bestlam, newx = newx)
+dim(glmnet.pred)
+glmnet.pred
+
+ggp = ggplot(data = test) + 
+  geom_line(aes(x = date, y = totalTrips), color = 'red') + 
+  geom_line(aes(x = date, y = glmnet.pred), color = 'green')
+ggp
+
+cat("Train RMSE for glmnet", mean(glmnet.mod$results$RMSE))
+cat("Test RMSE for glmnet", sqrt(mean((glmnet.pred - test$totalTrips)^2)))
+```
+
+
+***Regularized Poisson Regression***
+```{r}
+pois.mod <- train(totalTrips ~ temp + totalCrimes + humidity + windspeed + visibility + feelslike + uvindex,
+                    data = train,
+                    method = "glmnet",
+                    family = "poisson",
+                    trControl = myTimeControl,
+                    tuneLength=tuneLength.num,
+                    metric='RMSE')
+```
+
+***Testing the model (Regularized Linear Regression) and plotting it's results over here.***
+```{r}
+bestlam = glmnet.mod$bestTune$lambda
+bestlam
+glmnet.pred = predict(glmnet.mod$finalModel, s = bestlam, newx = newx)
+dim(glmnet.pred)
+glmnet.pred
+
+ggp = ggplot(data = test) + 
+  geom_line(aes(x = date, y = totalTrips), color = 'red') + 
+  geom_line(aes(x = date, y = glmnet.pred), color = 'green')
+ggp
+
+cat("Train RMSE for glmnet", mean(glmnet.mod$results$RMSE))
+cat("Test RMSE for glmnet", sqrt(mean((glmnet.pred - test$totalTrips)^2)))
 ```
 
 _*Training the Gam Model.*_
@@ -103,8 +154,13 @@ gam.mod <- train(totalTrips ~ temp + totalCrimes + humidity + windspeed + visibi
 
 _* Comparing the models over here.*_
 ```{r}
-resamps <- resamples(list(glmnet = glmnet.mod, gam=gam.mod))
+resamps <- resamples(list(glmnet = glmnet.mod, glmnet.pois = pois.mod))
 ss <- summary(resamps)
 knitr::kable(ss[[3]]$RMSE)
+```
+
+```{r}
+trellis.par.set(caretTheme())
+dotplot(resamps, metric = "RMSE")
 ```
 
