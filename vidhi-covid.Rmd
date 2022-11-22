@@ -1,0 +1,374 @@
+Merging trip merge_df from 2019-2021 to see how covid has affected trips over the years
+
+
+```{r}
+trip_2020_data = read.csv("C:\\Users\\vidhi\\OneDrive\\Desktop\\dps\\Finalproject\\BlueBike\\bluebikes_tripdata_2020.csv")
+trip_2019_data = read.csv("C:\\Users\\vidhi\\OneDrive\\Desktop\\dps\\Finalproject\\BlueBike\\bluebikes_tripdata_2019.csv")
+```
+
+```{r}
+merge_df = rbind(trip_2019_data, trip_2020_data)
+
+```
+
+EDA
+
+1. Loading the the libraries
+
+```{r} 
+
+library(data.table) # for faster loading on large dataset
+library(tidyverse) # load ggplot, dplyr
+library(leaflet) # interactive mapping 
+library(leaflet.extras) #extra mapping for leaflet
+library(geosphere) #used to calculate distance
+library(lubridate) #formatting date and time
+library(gridExtra) # multiple plot arrange
+library(grid) #multiple plot arrange
+library(psych) #to get describe function
+
+
+```
+
+2. loading the station dataset
+```{r}
+station = read.csv("C:\\Users\\vidhi\\OneDrive\\Desktop\\dps\\Finalproject\\BlueBike\\hubway_stations.csv")
+head(station)
+head(merge_df)
+
+library(IRdisplay)
+
+help(.onLoad)
+```
+3.visualize all the dock stations in Boston 
+
+```{r}
+map1 <- station %>% 
+  leaflet() %>%
+  setView(lng = -71.0589, lat = 42.3601, zoom = 13) %>% 
+  addTiles() %>%
+  addMarkers(lng = station$lng, lat = station$lat, popup = station$Station)
+
+map1
+```
+
+
+5. Data Cleaning
+
+```{r}
+
+#convert second to minutes and round it non decimal points
+merge_df$minutes <- round(merge_df$tripduration/60, 0)
+
+
+#calculate the age from birth year
+merge_df$age <- 2019 - merge_df$`birth.year`
+
+#recoding gender variables
+merge_df$gender <- as.factor(recode(merge_df$gender, "0" = "Female", "1" = "Male", "2" = "Prefer not to say"))
+
+#convert the time and date variable to correct format
+merge_df$starttime <- ymd_hms(merge_df$starttime)
+merge_df$stoptime <- ymd_hms(merge_df$stoptime)
+
+
+#convert the time and date variable to correct format
+merge_df$starttime <- ymd_hms(merge_df$starttime)
+merge_df$stoptime <- ymd_hms(merge_df$stoptime)
+
+#separate date and time
+merge_df <- merge_df %>%
+  mutate_at(vars(starttime), ymd_hms) %>%
+  mutate_at(vars(starttime), funs("start_date" = date(.)))
+
+merge_df <- merge_df %>%
+  mutate_at(vars(stoptime), ymd_hms) %>%
+  mutate_at(vars(stoptime), funs("stop_date" = date(.)))
+
+#extracting day, weekday and hour
+merge_df$day <- day(merge_df$starttime)
+merge_df$weekday <- wday(merge_df$starttime, label = TRUE)
+merge_df$hour <- hour(merge_df$starttime)
+
+# writing function for the distance formula
+dist <- function(long1, lat1, long2, lat2) {
+  R <- 6371
+  radian <-  pi / 180
+  a1 <- lat1 * radian
+  a2 <- long1 * radian
+  b1 <- lat2 * radian
+  b2 <- long2 * radian
+  diff_long <- b2 - a2
+  diff_lat <- b1 - a1
+  a <- (sin(diff_lat/2))^2 + cos(a1) * cos(b1) * (sin(diff_long/2))^2
+  c <- 2 * atan2(sqrt(a), sqrt(1 - a))
+  d <- R * c
+  return(d)
+}
+
+# return the calculation into 2 decimals and data frame
+a <- as.data.frame(round(dist(merge_df$`start station longitude`, merge_df$`start station latitude`, merge_df$`end station longitude`, merge_df$`end station latitude`),2))
+
+glimpse(merge_df)
+
+```
+
+
+6. Visualizing number of subscribers and customers in 2019 and 2020
+
+
+```{r}
+```
+
+
+```{r}
+counts <- table(merge_df$usertype, merge_df$year )
+barplot(counts, main=" bikes used customer vs subscribernder in 2019 & 2020",
+        xlab="month", col=c("yellow","red"),
+        legend = rownames(counts), beside=TRUE)
+```
+
+7. Visualizing Top 10 Most Popular Start Station Docks in 2019 
+```{r}
+
+popular_start_stations_2019 <- merge_df %>%
+filter(year == "2019") %>%
+group_by(start.station.name) %>%
+dplyr::summarise(number_of_users = n())
+
+head(popular_start_stations_2019 %>% arrange(desc(number_of_users)), 3)
+head(popular_start_stations_2019 %>% arrange(number_of_users), 3)
+
+top_10_popular_start_stations_2019 <- popular_start_stations_2019 %>%
+arrange(desc(number_of_users)) %>%
+head(10)
+
+top_10_popular_stations_2019 <- plot_ly(data = top_10_popular_start_stations_2019,
+                                        x = ~number_of_users,
+                                        y = ~reorder(start.station.name, number_of_users),
+                                        type = "bar",
+                                        name = "Number of Customers",
+                                        width = 1,
+                                        orientation = "h",
+                                        marker = list(color = "tomato")
+                                        ) %>%
+                                        layout(title = "Top 10 Most Popular Start Station Docks in 2019",
+                                               xaxis = list(title = "Number of Users"),
+                                               yaxis = list(title =""), 
+                                               barmode = "group",
+                                               autosize = TRUE
+                                              )
+
+top_10_popular_stations_2019
+
+```
+In 2019, MIT at Mass Ave / Amherst St station dock was the most popular start station dock, while 8D QC Station 01 was the least popular start station dock.
+
+8. Top 10 Most Popular end Station Docks in 2019
+```{r}
+# Figuring out which end stations are the most popular and the least popular in 2019
+
+popular_end_stations_2019 <- merge_df %>%
+filter(year == "2019") %>%
+group_by(end.station.name) %>%
+dplyr::summarise(number_of_users = n())
+
+head(popular_end_stations_2019 %>% arrange(desc(number_of_users)), 3)
+head(popular_end_stations_2019 %>% arrange(number_of_users), 3)
+
+top_10_popular_end_stations_2019 <- popular_end_stations_2019 %>%
+arrange(desc(number_of_users)) %>%
+head(10)
+
+top_10_popular_end_stations_2019 <- plot_ly(data = top_10_popular_end_stations_2019,
+                                        x = ~number_of_users,
+                                        y = ~reorder(end.station.name, number_of_users),
+                                        type = "bar",
+                                        name = "Number of Customers",
+                                        width = 1,
+                                        orientation = "h",
+                                        marker = list(color = "darkkhaki")
+                                        ) %>%
+                                        layout(title = "Top 10 Most Popular End Station Docks in 2019",
+                                               xaxis = list(title = "Number of Users"),
+                                               yaxis = list(title =""), 
+                                               barmode = "group"
+                                              )
+
+top_10_popular_end_stations_2019
+```
+In 2019, the most popular end station dock was also MIT at Mass Ave / Amherst St, while the least popular end station dock was 8D QC Station 02.
+
+9. Top 10 Most Popular Start Station Docks in 2020
+```{r}
+# Figuring out which start stations are the most popular and the least popular in 2020
+
+popular_start_stations_2020 <- merge_df %>%
+filter(year == "2020") %>%
+group_by(start.station.name) %>%
+dplyr::summarise(number_of_users = n())
+
+head(popular_start_stations_2020 %>% arrange(desc(number_of_users)), 3)
+head(popular_start_stations_2020 %>% arrange(number_of_users), 3)
+top_10_popular_start_stations_2020 <- popular_start_stations_2020 %>%
+arrange(desc(number_of_users)) %>%
+head(10)
+
+top_10_popular_stations_2020 <- plot_ly(data = top_10_popular_start_stations_2020,
+                                        x = ~number_of_users,
+                                        y = ~reorder(start.station.name, number_of_users),
+                                        type = "bar",
+                                        name = "Number of Customers",
+                                        width = 1,
+                                        orientation = "h",
+                                        marker = list(color = " cadetblue")
+                                        ) %>%
+                                        layout(title = "Top 10 Most Popular Start Station Docks in 2020",
+                                               xaxis = list(title = "Number of Users"),
+                                               yaxis = list(title =""), 
+                                               barmode = "group",
+                                               margin = list(l = 390)
+                                              )
+top_10_popular_stations_2020
+```
+In 2020, Central Square at Mass Ave / Essex St was the most popular start station dock, while MTL-ECO4-01 was the least popular start station dock.
+
+10. Top 10 Most Popular End Station Docks in 2020
+
+```{r}
+
+# Figuring out which end stations are the most popular and the least popular in 2020
+
+popular_end_stations_2020 <- merge_df %>%
+filter(year == "2020") %>%
+group_by(end.station.name) %>%
+dplyr::summarise(number_of_users = n())
+
+head(popular_end_stations_2020 %>% arrange(desc(number_of_users)), 3)
+head(popular_end_stations_2020 %>% arrange(number_of_users), 3)
+top_10_popular_end_stations_2020 <- popular_end_stations_2020 %>%
+arrange(desc(number_of_users)) %>%
+head(10)
+
+top_10_popular_end_stations_2020 <- plot_ly(data = top_10_popular_end_stations_2020,
+                                        x = ~number_of_users,
+                                        y = ~reorder(end.station.name, number_of_users),
+                                        type = "bar",
+                                        name = "Number of Customers",
+                                        width = 1,
+                                        orientation = "h",
+                                        marker = list(color = " mediumpurple")
+                                        ) %>%
+                                        layout(title = "Top 10 Most Popular End Station Docks in 2020",
+                                               xaxis = list(title = "Number of Users"),
+                                               yaxis = list(title =""), 
+                                               barmode = "group",
+                                               margin = list(l = 390)
+                                              )
+top_10_popular_end_stations_2020
+```
+In 2020, the most popular end station dock was also Central Square at Mass Ave / Essex St, while the least popular end station dock was Mobile Temporary Station 1.
+
+It appears that COVID 19 has affected BlueBikes users, particularly those who are MIT students. The start and end stations have been changed from MIT at Mass Ave / Amherst St to Central Square at Mass Ave / Essex St.
+Students were advised to take remote classes when COVID 19 started affecting them.
+As a result, this finding clearly indicates that BlueBike users, especially those at MIT, are affected by COVID 19.
+
+11. Weekly usage dataset
+```{r}
+# Weekly usage dataset
+
+weekly_usage <- merge_df %>%
+mutate(weekdays = wday(starttime, label = TRUE)) %>%
+select(start.station.name, starttime, weekday, year)
+
+# 2019
+options(dplyr.summarise.inform = FALSE)
+
+weekly_trend_2019 <- weekly_usage %>%
+filter(year == "2019") %>%
+group_by(year, weekday) %>%
+dplyr::summarise(number_of_users = n())
+
+# 2020
+
+weekly_trend_2020 <- weekly_usage %>%
+filter(year == "2020") %>%
+group_by(year, weekday) %>%
+dplyr::summarise(number_of_users = n())
+
+weekly_trend_comparison <- plot_ly(data = weekly_trend_2019, x = ~ weekday) %>%
+                           add_trace(y = ~number_of_users, 
+                                     type = "scatter", 
+                                     mode = "lines", 
+                                     line = list(color = "blue", width = 2),
+                                     name = "User Trend in 2019") %>%
+                           add_trace(data = weekly_trend_2020,
+                                     y = ~number_of_users,
+                                     type = "scatter", 
+                                     mode = "lines", 
+                                     line = list(color = "green", width = 2),
+                                     name = "User Trend in 2020") %>%
+                           layout(title = "Trend in Weekly Usage of BlueBikes",
+                                  xaxis = list(title = "Days of the Week"),
+                                  yaxis = list(title = "Number of Users")
+                                 )
+weekly_trend_comparison
+
+```
+According to this graph, COVID 19 has dramatically decreased usage on weekdays.Bicycles were used by many commuters in 2019 to get to schools and offices.COVID 19 has caused many people to take remote classes or work remotely, so BlueBike usage has declined significantly on weekdays since 2020.
+Also, in 2019, the busiest day used to be Wednesday, while Sunday was the least busy day; in 2020, the busiest day was Saturday, while Monday was the least busy day.
+
+
+
+
+Visualizing male and female
+
+12. bikes used male vs female in 2019 & 2020 
+
+```{r}
+counts <- table(merge_df$gender, merge_df$year )
+barplot(counts, main=" bikes used male vs female in 2019 & 2020",
+        xlab="month", col=c("yellow","red", "green"),
+        legend = rownames(counts), beside=TRUE)
+
+```
+13. Gender on Blue Bikes Usage
+
+```{r}
+gender <- merge_df %>%
+  group_by(gender) %>%
+  dplyr::summarise(total = n()) %>%
+  filter(gender != "Prefer not to say")
+
+gender %>% ggplot(aes(x = gender, y = total, fill = gender)) +
+  geom_col() +
+  geom_text(aes(label = total), vjust = -0.1) +
+  labs(main = "Gender on Blue Bikes Usage",
+       x = "Gender", 
+       y = "Total") + 
+  guides(fill = FALSE) +
+  theme_bw()
+
+```
+```{r}
+counts <- table(merge_df$month )
+barplot(counts, main="bikes were used in 2 years by month",
+        xlab="month", col=c("darkblue","red", "darkgreen"),
+        legend = rownames(counts), beside=TRUE)
+
+```
+
+```{r}
+counts <- table(merge_df$age )
+barplot(counts, main="bikes were used by age in 2 years",
+        xlab="age", col=c("darkblue","red", "darkgreen"), beside=TRUE)
+
+```
+```{r}
+counts <- table(merge_df$weekday, merge_df$year )
+barplot(counts, main=" bikes used weekly in 2019 & 2020",
+        xlab="month", col=c("yellow","red","green","blue","purple","violet","pink"),
+        legend = rownames(counts), beside=TRUE)
+```
+
+
