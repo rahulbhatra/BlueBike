@@ -5,11 +5,21 @@ date: "2022-11-21"
 ---
 
 ```{r}
+head(data)
+
+trainIndex <- c(seq(1, 0.8*nrow(data)))
+testIndex <- c(seq(0.8*nrow(data) + 1, nrow(data)))
+
+train  <- data[trainIndex, ]
+test   <- data[testIndex, ]
+```
+
+```{r}
 library("mgcv")
-gam.fit = gam(totalTrips ~ temp + totalCrimes + humidity + snow + windspeed + visibility, data = train)
+gam.fit = gam(totalTrips ~ temp + totalCrimes + humidity + windspeed + visibility + feelslike + uvindex, data = train)
 summary(gam.fit)
 
-gam.fit.smoothing = gam(totalTrips ~ temp + totalCrimes + humidity + snow + windspeed + visibility, data = train)
+gam.fit.smoothing = gam(totalTrips ~ temp + totalCrimes + humidity + windspeed + visibility + feelslike + uvindex, data = train)
 summary(gam.fit.smoothing)
 ```
 
@@ -41,7 +51,7 @@ ggp = ggplot(data = plot) +
 ggp
 ```
 
-_*Using Cross Validation over here.*_
+_*Using Cross Validation over here. The initial Window will be of length 500 and test will be of 100*_
 ```{r}
 
 library(tidyverse)
@@ -54,8 +64,8 @@ for(i in 1:1809) seeds[[i]] <- sample.int(1000, 5, replace = FALSE)
 registerDoParallel(cores=3)
 
 myTimeControl <- trainControl(method = "timeslice",
-                              initialWindow = 36,
-                              horizon = 12,
+                              initialWindow = 500,
+                              horizon = 100,
                               fixedWindow = FALSE,
                               allowParallel = TRUE,
                               seeds = seeds)
@@ -67,28 +77,26 @@ _*Regularized Linear Regression*_
 ```{r}
 tuneLength.num <- 5
 
-train
-
-glmnet.mod <- train(totalTrips ~ temp + totalCrimes + humidity + snow + windspeed + visibility,
+glmnet.mod <- train(totalTrips ~ temp + totalCrimes + humidity + windspeed + visibility + feelslike + uvindex,
                     data = train,
                     method = "glmnet",
                     family = "gaussian",
                     trControl = myTimeControl,
                     tuneLength=tuneLength.num,
-                    metric='RMSE',
-                    gam=gam.mod
+                    metric='RMSE'
                 )
+summary(glmnet.mod)
 ```
 
 _*Training the Gam Model.*_
 ```{r}
-gam.mod <- train(totalTrips ~ temp + totalCrimes + humidity + snow + windspeed + visibility,
+train
+gam.mod <- train(totalTrips ~ temp + totalCrimes + humidity + windspeed + visibility + feelslike + uvindex,
                    data = train,
                    method = "gam",
                    trControl = myTimeControl,
                    tuneLength=tuneLength.num,
-                   metric='RMSE',
-                  na.action = na.pass
+                   metric='RMSE'
                  )
 ```
 

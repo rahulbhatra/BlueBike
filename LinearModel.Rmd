@@ -13,7 +13,8 @@ testIndex <- c(seq(0.8*nrow(data) + 1, nrow(data)))
 train  <- data[trainIndex, ]
 test   <- data[testIndex, ]
 
-lm.fit = lm(data = train, totalTrips ~ temp + totalCrimes + humidity + snow + windspeed + visibility)
+lm.fit = lm(data = train, totalTrips ~ temp + totalCrimes + humidity + windspeed + visibility + 
+    feelslike + uvindex)
 summary(lm.fit)
 ```
 

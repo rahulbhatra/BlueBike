@@ -27,19 +27,24 @@ write.csv(tripData, "TripData/tripdata.csv")
 rm(tripData)
 tripData = read.csv("TripData/tripData.csv")
 tripData
+cat("Number of na values inside the data", sum(is.na(tripData)))
 ```
 
 ***Counting number of trips by date***
 
 ```{r}
 library(dplyr)
+library(ggplot2)
 tripData$date = as.Date(tripData$starttime, "%Y-%m-%d")
 
 numberOfTrips = tripData %>% group_by(date) %>% 
   summarise(totalTrips=length(bikeid),
             .groups = 'drop')
 numberOfTrips
-plot(x = numberOfTrips$date, y = numberOfTrips$totalTrips, xlab = "Month of the Year", ylab = "Total Number of Trips", type = "l", main = "Date Vs Number of Trips")
+ggp = ggplot(data = numberOfTrips) + 
+  geom_line(aes(x = date, y = totalTrips), color = 2) + 
+  xlab("Year") + ylab("Total Number of Trips") + ggtitle("Date Vs Number of Trips")
+ggp
 ```
 
 ```{r}
@@ -51,6 +56,7 @@ crimeData
 ***Getting the Crime Count occured on a date***
 ```{r}
 library(dplyr)
+library(ggplot2)
 crimeData$OCCURRED_ON_DATE = as.Date(crimeData$OCCURRED_ON_DATE, "%Y-%m-%d")
 crimeCount = crimeData %>% group_by(OCCURRED_ON_DATE) %>% 
   summarise(totalCrimes=length(INCIDENT_NUMBER),
@@ -59,11 +65,16 @@ crimeData
 crimeCount = crimeCount[crimeCount$OCCURRED_ON_DATE >= as.Date("2015-01-01") & crimeCount$OCCURRED_ON_DATE <= as.Date("2022-12-31"), ]
 length(crimeCount$totalCrimes)
 length(crimeCount$OCCURRED_ON_DATE)
-plot(x = crimeCount$OCCURRED_ON_DATE, y = crimeCount$totalCrimes, xlab = "Month of the Year", ylab = "Total Number of Crimes", type = "l", main = "Date Vs Number of Crimes")
+# plot(x = crimeCount$OCCURRED_ON_DATE, y = crimeCount$totalCrimes, xlab = "Month of the Year", ylab = "Total Number of Crimes", type = "l", main = "Date Vs Number of Crimes")
+ggp = ggplot(data = crimeCount) +
+  geom_line(aes(x = OCCURRED_ON_DATE, y = totalCrimes), color = 4) +
+  xlab("Year") + ylab("Tatal Number of Crimes")
+ggp
 ```
 
 ***Combining the weather data***
 ```{r}
+rm(weatherData)
 weatherData = data.frame()
 weatherData = rbind(weatherData, read.csv("WeatherData/Weather2015.csv"))
 weatherData = rbind(weatherData, read.csv("WeatherData/Weather2016.csv"))
@@ -91,8 +102,24 @@ weatherData = read.csv("WeatherData/weather.csv")
 
 ```{r}
 rm(data)
+dim(numberOfTrips)
 data = merge(numberOfTrips, crimeCount, by.x = "date", by.y = "OCCURRED_ON_DATE")
-data = merge(data, weatherData, by.x = "date", by.y ="datetime")
+dim(data)
+cat("Total Number of na fields in the dataset", sum(is.na(data)))
+
+data = merge(data, weatherData, by.x = "date", by.y ="datetime", all.x = TRUE)
+dim(data)
+cat("Total Number of na fields in the dataset", sum(is.na(data)))
+
+sum(is.na(data$totalCrimes))
+sum(is.na(data$temp))
+sum(is.na(data$humidity))
+sum(is.na(data$windspeed))
+sum(is.na(data$visibility))
+sum(is.na(data$feelslike))
+sum(is.na(data$uvindex))
+
+
 data
 ```
 
