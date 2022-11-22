@@ -41,3 +41,62 @@ ggp = ggplot(data = plot) +
 ggp
 ```
 
+_*Using Cross Validation over here.*_
+```{r}
+
+library(tidyverse)
+library(caret)
+library(doParallel)
+
+set.seed(123)
+seeds <- vector(mode = "list", length = 1809)
+for(i in 1:1809) seeds[[i]] <- sample.int(1000, 5, replace = FALSE)
+registerDoParallel(cores=3)
+
+myTimeControl <- trainControl(method = "timeslice",
+                              initialWindow = 36,
+                              horizon = 12,
+                              fixedWindow = FALSE,
+                              allowParallel = TRUE,
+                              seeds = seeds)
+
+```
+
+
+_*Regularized Linear Regression*_
+```{r}
+tuneLength.num <- 5
+
+train
+
+glmnet.mod <- train(totalTrips ~ temp + totalCrimes + humidity + snow + windspeed + visibility,
+                    data = train,
+                    method = "glmnet",
+                    family = "gaussian",
+                    trControl = myTimeControl,
+                    tuneLength=tuneLength.num,
+                    metric='RMSE',
+                    gam=gam.mod
+                )
+```
+
+_*Training the Gam Model.*_
+```{r}
+gam.mod <- train(totalTrips ~ temp + totalCrimes + humidity + snow + windspeed + visibility,
+                   data = train,
+                   method = "gam",
+                   trControl = myTimeControl,
+                   tuneLength=tuneLength.num,
+                   metric='RMSE',
+                  na.action = na.pass
+                 )
+```
+
+
+_* Comparing the models over here.*_
+```{r}
+resamps <- resamples(list(glmnet = glmnet.mod, gam=gam.mod))
+ss <- summary(resamps)
+knitr::kable(ss[[3]]$RMSE)
+```
+
