@@ -1,0 +1,159 @@
+---
+title: "PolynomialModel"
+output: html_document
+date: "2022-11-22"
+---
+***Install all required packages***
+```{r}
+install.packages("dplyr")
+install.packages("caret")
+install.packages("gridExtra")
+install.packages("e1071")
+```
+
+***Trip Data***
+```{r}
+tripData = read.csv("TripData/tripdata.csv")
+head(tripData)
+library(dplyr)
+tripData$date = as.Date(tripData$starttime, "%Y-%m-%d")
+
+numberOfTrips = tripData %>% group_by(date) %>% 
+  summarise(totalTrips=length(bikeid),
+            .groups = 'drop')
+numberOfTrips
+plot(x = numberOfTrips$date, y = numberOfTrips$totalTrips, xlab = "Month of the Year", ylab = "Total Number of Trips", type = "l", main = "Date Vs Number of Trips")
+```
+***Crime data***
+```{r}
+crimeData = read.csv("CrimeData/crimedata.csv")
+head(crimeData)
+library(dplyr)
+crimeData$OCCURRED_ON_DATE = as.Date(crimeData$OCCURRED_ON_DATE, "%Y-%m-%d")
+crimeCount = crimeData %>% group_by(OCCURRED_ON_DATE) %>% 
+  summarise(totalCrimes=length(INCIDENT_NUMBER),
+            .groups = 'drop')
+crimeData
+crimeCount = crimeCount[crimeCount$OCCURRED_ON_DATE >= as.Date("2015-01-01") & crimeCount$OCCURRED_ON_DATE <= as.Date("2022-12-31"), ]
+length(crimeCount$totalCrimes)
+length(crimeCount$OCCURRED_ON_DATE)
+plot(x = crimeCount$OCCURRED_ON_DATE, y = crimeCount$totalCrimes, xlab = "Month of the Year", ylab = "Total Number of Crimes", type = "l", main = "Date Vs Number of Crimes")
+```
+***Weather data***
+```{r}
+weatherData = read.csv("WeatherData/weather.csv")
+weatherData$datetime = as.Date(weatherData$datetime, "%Y-%m-%d")
+head(weatherData)
+```
+***Merge dataset***
+```{r}
+rm(data)
+data = merge(numberOfTrips, crimeCount, by.x = "date", by.y = "OCCURRED_ON_DATE")
+data = merge(data, weatherData, by.x = "date", by.y ="datetime")
+data
+```
+*** Backup of the final clubbed dataset***
+```{r}
+write.csv(data, "Data/data.csv")
+```
+*** Read data.csv***
+```{r}
+data = read.csv("Data/data.csv")
+```
+***We split the data into training and testing datasets using createDataPartition() from caret package***
+```{r}
+library(caret)
+head(data)
+test_train_split <- createDataPartition(y = data$totalTrips, p = 0.8, list = FALSE)
+train <- data[test_train_split,]
+test <- data[-test_train_split,]
+```
+***We fit a polynomial regression model***
+```{r}
+poly.model <- lm(data = train, totalTrips ~ polym(temp, totalCrimes, humidity, snow, windspeed, visibility, degree = 2, raw = TRUE))
+summary(poly.model)
+```
+***Since the Standard error is way too high let us update the model to cubic***
+```{r}
+cubic.model <- lm(data = train, totalTrips ~ polym(temp, totalCrimes, humidity, snow, windspeed, visibility, degree = 3, raw = TRUE))
+summary(cubic.model)
+```
+***We have seen a reduction in the residual standard error, let us increase the degree further more, degree = 4***
+```{r}
+deg4.model <- lm(data = train, totalTrips ~ polym(temp, totalCrimes, humidity, snow, windspeed, visibility, degree = 4, raw = TRUE))
+summary(deg4.model)
+```
+***Let us see if we can reduce the training residual error even more, degree=5***
+```{r}
+deg5.model <- lm(data = train, totalTrips ~ polym(temp, totalCrimes, humidity, snow, windspeed, visibility, degree = 5, raw = TRUE))
+summary(deg5.model)
+```
+***degree=6***
+```{r}
+deg6.model <- lm(data = train, totalTrips ~ polym(temp, totalCrimes, humidity, snow, windspeed, visibility, degree = 6, raw = TRUE))
+summary(deg6.model)
+```
+***Let us observe if the residual standard error increases further if we increase the degree to 7***
+```{r}
+deg7.model <- lm(data = train, totalTrips ~ polym(temp, totalCrimes, humidity, snow, windspeed, visibility, degree = 7, raw = TRUE))
+summary(deg7.model)
+```
+***By increase in polynomial degree, the overall standard error is increasing. Therefore, let us visualize the data and decide which one has a non-linear relation with the response variable and plot the same***
+```{r}
+library(gridExtra)
+ggp_temp <- ggplot(data = data, aes(x = totalTrips, y = temp)) +
+  geom_point(color = "red") + ggtitle("Trips v/s Temp") + xlab("totalTrips") + ylab("Temperature")
+ggp_crimes <- ggplot(data = data, aes(x = totalTrips, y = totalCrimes)) +
+  geom_point(color = "blue") + ggtitle("Trips v/s Crimes") + xlab("totalTrips") + ylab("Crimes")
+ggp_humidity <- ggplot(data = data, aes(x = totalTrips, y = humidity)) +
+  geom_point(color = "green") +  ggtitle("Trips v/s Humidity") + xlab("totalTrips") + ylab("Humidity")
+ggp_snow <- ggplot(data = data, aes(x = totalTrips, y = snow)) +
+  geom_point(color = "yellow") +  ggtitle("Trips v/s Snow") + xlab("totalTrips") + ylab("Snow")
+ggp_windspeed <- ggplot(data = data, aes(x = totalTrips, y = windspeed)) +
+  geom_point(color = "orange") +  ggtitle("Trips v/s WindSpeed") + xlab("totalTrips") + ylab("WindSpeed")
+ggp_visibility <- ggplot(data = data, aes(x = totalTrips, y = visibility)) +
+  geom_point(color = "black") +  ggtitle("Trips v/s Visibility") + xlab("totalTrips") + ylab("Visibility")
+
+grid.arrange(ggp_temp, ggp_crimes, ggp_humidity, ggp_snow, ggp_windspeed, ggp_visibility, ncol = 3)
+```
+***We can observe slight non-linear relation for all of the predictors, Let us plot our best model, degree=5, and see if this non-linearity is visible or not.***
+```{r}
+plot(deg5.model, 1, col = "blue")
+```
+***From this we can observe that red line is almost linear close to residuals but deflects at the ends showing non-linearity. This is way too close to linearity of predictors with respect to the response variable. But, due to slight non-linearity among individual predictors, the polynomial regression model is better than the linear model***
+
+***Let us see how our best model is far superior than linear model***
+```{r}
+best.model <- deg5.model
+anova(lm.fit, best.model)
+```
+***Here Model 1 represents the linear model, while Model 2 corresponds to the larger polynomial model. The null hypothesis is that the two models fit the data equally well, and the alternative hypothesis is that the full model is superior. Here the F-statistic is 2.2172 and the associated p -value is virtually zero. Also, there is a significant reduction in RSS in polynomial model. This provides very clear evidence that the polynomial model is far superior to the linear model. This is not surprising, since earlier we saw evidence for non-linearity in the relationship between totalTrips and predictors: Temp, Crimes, Humidity, Snow, Wind speed, and Visibility.***
+
+***Let us perform prediction for our best model***
+```{r}
+poly.predict <- predict(best.model, newdata = test)
+poly.predict
+```
+***We are getting the issue of "Warning: prediction from a rank-deficient fit may be misleading" because we have more model parameters than observations in the dataset***
+```{r}
+str(best.model)
+```
+***Let us plot predictions***
+```{r}
+library(ggplot2)
+# poly.predict
+rm(y)
+ggp1 <-  ggplot(data = test) +
+  geom_point(aes(x = totalTrips, y = temp), color = "red") +
+  geom_point(aes(x = totalTrips, y = totalCrimes), color = "blue") +
+  geom_point(aes(x = totalTrips, y = humidity), color = "green") +
+  geom_point(aes(x = totalTrips, y = snow), color = "yellow") +
+  geom_point(aes(x = totalTrips, y = windspeed), color = "orange") +
+  geom_point(aes(x = totalTrips, y = visibility), color = "black") +
+  stat_smooth(aes(x = totalTrips, y = poly.predict), method = "lm") +
+  ggtitle("totalTrips v/s temp,crimes,humidity,snow,windspeed,visibility") + xlab("totalTrips") + ylab("temp,crimes,humidity,snow,windspeed,visibility")
+ggp1
+```
+
+
+
