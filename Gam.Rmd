@@ -49,10 +49,12 @@ plot
 
 head(plot)
 ggp = ggplot(data = plot) + 
-  geom_line(aes(x = test.date, y = test.totalTrips), color = 'red') + 
-  geom_line(aes(x = test.date, y = predicted), color = 'green')
+  geom_line(aes(x = test.date, y = test.totalTrips, colour = "Test Total Trips")) + 
+  geom_line(aes(x = test.date, y = predicted, colour = "GAM Fit Total Trips")) +
+  scale_color_manual(name = "Test vs Predictions", values = c("Test Total Trips" = 2, "GAM Fit Total Trips" = 3))
 ggp
 ```
+
 
 *Using Cross Validation over here. The initial Window will be of length 500 and test will be of 100*
 
@@ -75,6 +77,8 @@ myTimeControl <- trainControl(method = "timeslice",
                               seeds = seeds)
 
 ```
+
+
 
 *Regularized Linear Regression*
 
@@ -104,8 +108,9 @@ dim(glmnet.pred)
 glmnet.pred
 
 ggp = ggplot(data = test) + 
-  geom_line(aes(x = date, y = totalTrips), color = 'red') + 
-  geom_line(aes(x = date, y = glmnet.pred), color = 'green')
+  geom_line(aes(x = date, y = totalTrips, colour = "Test Total Trips")) +
+  geom_line(aes(x = date, y = glmnet.pred, colour = "Reg. LR Total Trips")) + 
+  scale_color_manual(name = "Test vs Predictions", values = c("Test Total Trips" = 2, "Reg. LR Total Trips" = 3))
 ggp
 
 cat("Train RMSE for glmnet", mean(glmnet.mod$results$RMSE))
@@ -136,8 +141,10 @@ dim(pois.pred)
 pois.pred
 
 ggp = ggplot(data = test) + 
-  geom_line(aes(x = date, y = totalTrips), color = 'red') + 
-  geom_line(aes(x = date, y = pois.pred), color = 'green')
+  geom_line(aes(x = date, y = totalTrips, colour = "Test Total Trips")) +
+  # geom_line(aes(x = date, y = glmnet.pred, colour = "Reg. LR Total Trips")) + 
+  geom_line(aes(x = date, y = pois.pred, colour = "Poisson Total Trips")) + 
+  scale_color_manual(name = "Test vs Predictions", values = c("Test Total Trips" = 2, "Reg. LR Total Trips" = 3, "Poission Total Trips" = 4))
 ggp
 
 cat("Train RMSE for glmnet", mean(pois.mod$results$RMSE))
@@ -155,12 +162,36 @@ gam.mod <- train(totalTrips ~ temp + totalCrimes + humidity + windspeed + visibi
                    tuneLength=tuneLength.num,
                    metric='RMSE'
                  )
+
+plot(gam.mod)
+gam.mod
 ```
+***Testing the model (Gam) and plotting it's results over here.***
+
+```{r}
+gam.mod$bestTune
+gam.bestlam = gam.mod$bestTune$lambda
+gam.bestlam
+gam.pred = predict(gam.mod$finalModel, s = gam.bestlam, newx = newx)
+dim(gam.pred)
+gam.pred
+
+ggp = ggplot(data = test) + 
+  geom_line(aes(x = date, y = totalTrips, colour = "Test Total Trips")) +
+  geom_line(aes(x = date, y = glmnet.pred, colour = "Reg. LR Total Trips")) +
+  geom_line(aes(x = date, y = gam.pred, colour = "Gam Total Trips")) + 
+  scale_color_manual(name = "Test vs Predictions", values = c("Test Total Trips" = 2, "Reg. LR Total Trips" = 3, "Gam Total Trips" = 4))
+ggp
+
+cat("Train RMSE for glmnet", mean(gam.mod$results$RMSE))
+cat("Test RMSE for glmnet", sqrt(mean((gam.mod - test$totalTrips)^2)))
+```
+
 
 \_\* Comparing the models over here.\*\_
 
 ```{r}
-resamps <- resamples(list(glmnet = glmnet.mod, glmnet.pois = pois.mod))
+resamps <- resamples(list(glmnet = glmnet.mod, glmnet.pois = pois.mod, gam=gam.mod))
 ss <- summary(resamps)
 knitr::kable(ss[[3]]$RMSE)
 ```
