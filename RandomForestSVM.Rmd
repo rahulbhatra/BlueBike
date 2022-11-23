@@ -1,0 +1,522 @@
+---
+title: "RandomForestSVM"
+author: "MANAN SAGAR"
+date: "2022-11-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+install.packages("tidyverse")
+install.packages("lubridate")
+install.packages("ggcorrplot")
+install.packages("lattice")
+install.packages("psych")
+install.packages("reshape2")
+install.packages("DataExplorer")
+install.packages("car")
+install.packages("caret")
+install.packages("cowplot")
+install.packages("caTools")
+install.packages("rpart.plot")
+install.packages("e1071")
+install.packages("leaps")
+install.packages("rpart")
+install.packages("randomForest")
+install.packages("caTools")
+library(tidyverse)
+library(lubridate)
+library(ggcorrplot)
+library(lattice)
+library(psych)
+library(DataExplorer)
+library(reshape2)
+library(car)
+library(caret)
+library(cowplot)
+library(caTools)
+library(e1071)
+library(rpart)
+par(mfrow=c(1,1))
+
+
+```
+
+```{r}
+install.packages("leaps")
+install.packages("randomForest")
+install.packages("rpart.plot")
+library(leaps)
+library(randomForest)
+library(rpart.plot)
+```
+
+```{r}
+b <- read.csv("/Users/manansagar/Downloads/data.csv")
+head(b)
+```
+
+```{r}
+#format the Month and day as a number that can be ordered as a factor
+
+b$Year <- as.factor(as.character(b$date, format = "%Y"))
+b$Month <- as.character(b$date, format = "%m")
+b$DayName <- as.character(b$date, format = "%u")
+b$Day <- as.character(b$date, format = "%d")
+
+b$date <- NULL
+head(b, 5)
+```
+
+```{r}
+b$Month <- factor(
+  b$Month, levels = c("01","02","03","04","05","06","07","08","09","10","11","12"),
+  labels = c('January','February', 'March', 'April',
+             'May', 'June', 'July', 'August',
+             'September','October', 'November', 'December'),
+  ordered = TRUE)
+
+b$DayName <- factor(
+  b$DayName,levels = c(1,2,3,4,5,6,7),
+  labels = c('Monday','Tuesday','Wednesday','Thursday',
+             'Friday', 'Saturday','Sunday'),
+  ordered = TRUE)
+```
+
+```{r}
+#Rentals by Season & Temperature#
+# options(repr.plot.width=12, repr.plot.height=8)
+ggplot(b, aes(x = temp, y = totalTrips, fill = Month)) + geom_point() +
+  theme_bw(base_size = 20) +
+  labs(title = "Rentals by Month & Temperature", x = "Temperature Celsius", y = "Total Rentals") 
+  # scale_y_continuous(labels = scales::label_comma())
+```
+
+```{r}
+#####   Rentals by Month & Temperature & Year   #####
+ggplot(b, aes(temp, totalTrips, color = Month)) + geom_point() +
+  theme_bw(base_size = 10) + 
+  labs(title = "Rentals by Month, Temperature & Year", x = "Temperature Celsius", y = "Total Rentals") +
+  scale_y_continuous(labels = scales::label_comma()) +
+  facet_grid(~Year)
+```
+
+
+```{r}
+#####   Rentals by Humidity & Month     #####
+a1 = ggplot(b, aes(humidity, totalTrips, color = Month)) + geom_point() +
+  theme_bw(base_size = 10) + 
+   facet_grid(~Year) +
+  labs(title = "Rentals by Humidity & Month", x = "Humidity", y = "Total Rentals") +
+  scale_y_continuous(labels = scales::label_comma()) + 
+  theme(legend.position="bottom")
+  plot_grid(a1)
+```
+
+```{r}
+####    Rentals by Windspeed & Month    #####
+b1 = ggplot(b, aes(windspeed, totalTrips, color = Month)) + geom_point() +
+  theme_bw(base_size = 10) + 
+  facet_grid(~Year) +
+  labs(title = "Rentals by Windspeed & Month", x = "Wind Speed", y = "Total Rentals") +
+  scale_y_continuous(labels = scales::label_comma()) + 
+  theme(legend.position="bottom")
+options(repr.plot.width=16, repr.plot.height=8)
+plot_grid(b1)
+```
+
+```{r}
+####    Rentals by Visibility & Month    #####
+c1 = ggplot(b, aes(visibility, totalTrips, color = Month)) + geom_point() +
+  theme_bw(base_size = 10) + 
+  facet_grid(~Year) +
+  labs(title = "Rentals by Visibility & Month", x = "Visibility", y = "Total Rentals") +
+  scale_y_continuous(labels = scales::label_comma()) + 
+  theme(legend.position="bottom")
+options(repr.plot.width=16, repr.plot.height=8)
+plot_grid(c1)
+```
+
+```{r}
+####    Rentals by feelsLike & Month    #####
+c1 = ggplot(b, aes(feelslike, totalTrips, color = Month)) + geom_point() +
+  theme_bw(base_size = 10) + 
+  facet_grid(~Year) +
+  labs(title = "Rentals by Feels Like Temp & Month", x = "Feels Like Temp", y = "Total Rentals") +
+  scale_y_continuous(labels = scales::label_comma()) + 
+  theme(legend.position="bottom")
+options(repr.plot.width=16, repr.plot.height=8)
+plot_grid(c1)
+```
+
+```{r}
+####    Rentals by uvindex & Month    #####
+c1 = ggplot(b, aes(uvindex, totalTrips, color = Month)) + geom_point() +
+  theme_bw(base_size = 10) + 
+  facet_grid(~Year) +
+  labs(title = "Rentals by uvindex & Month", x = "uvindex", y = "Total Rentals") +
+  scale_y_continuous(labels = scales::label_comma()) + 
+  theme(legend.position="bottom")
+options(repr.plot.width=16, repr.plot.height=8)
+plot_grid(c1)
+```
+
+```{r}
+# ----   Rentals & Temperature by Weather 
+# w = c('skyblue1','skyblue2','skyblue3','skyblue4','grey40')
+ggplot(b, aes(temp, totalTrips, color = conditions)) + 
+  geom_jitter(width = 0.25, show.legend = F) + 
+  # scale_color_manual(values = w) +
+  labs(y="Count of Rentals", title = "Rentals & Temperature by Weather Conditions") + 
+  facet_grid(~conditions) + theme_bw(base_size = 10)
+```
+
+```{r}
+boxplot(totalTrips ~ DayName, data = b, frame = F, col = "grey40")
+```
+
+```{r}
+options(repr.plot.width=16, repr.plot.height=6)
+boxplot(totalTrips ~ Month, data = b, frame = F, col = "grey40")
+```
+
+```{r}
+boxplot(totalTrips ~ conditions, data = b, frame = F,col = "grey40")
+
+```
+
+```{r}
+# ANOVA - differences in Means
+aov.M <- aov(totalTrips ~ Month, data = b); summary(aov.M);
+aov.D <- aov(totalTrips ~ Day, data = b); summary(aov.D);
+aov.DN <- aov(totalTrips ~ DayName, data = b); summary(aov.DN);
+aov.C <- aov(totalTrips ~ conditions, data = b); summary(aov.C);
+```
+
+```{r}
+## Post Hoc test to identify which  group is different
+TukeyHSD(aov.M , which = "Month");
+TukeyHSD(aov.D, which = "Day");
+TukeyHSD(aov.DN, which = "DayName");
+TukeyHSD(aov.C, which = "conditions")
+```
+
+```{r}
+# Multicollinearity
+b$name <- NULL
+b$tempmax <- NULL
+b$tempmin <- NULL
+b$moonphase <- NULL
+b$sunset <- NULL
+b$feelslikemax <- NULL
+b$feelslikemin <- NULL
+b$description <- NULL
+b$icon <- NULL
+b$severerisk <- NULL
+b$sunrise <- NULL
+b$solarradiation <- NULL
+b$precipprob <- NULL
+b$precipcover <- NULL
+b$winddir <- NULL
+b$sealevelpressure <- NULL
+b$cloudcover <- NULL
+b$solarenergy <- NULL
+b$dew <- NULL
+b$precip <- NULL
+b$X <- NULL
+b$preciptype <- NULL
+b$snowdepth <- NULL
+b$snow <- NULL
+b$windgust <- NULL
+b$stations <- NULL
+b$windgust <- NULL
+b$conditions <- NULL #removing condition column too #
+
+head(b)
+
+```
+
+```{r}
+b <- b[,-c(1)]
+head(b)
+# removing serial number column
+```
+
+```{r}
+b1<-b
+```
+
+```{r}
+m <- b1
+# make all data types numeric
+cols <- c("totalTrips", "totalCrimes", "temp","feelslike", "humidity", "windspeed", 
+       "visibility", "uvindex","Year","Month","Day","DayName")
+
+m[,cols] <- m %>% select(all_of(cols)) %>% lapply(as.numeric)
+
+# Dropping response variable (Y) for calculating Multicollinearity
+mc <- m %>% select(-totalTrips, everything()) 
+
+```
+
+```{r}
+# step 3) correlate all the data
+mc <- cor(m)
+# sum(is.na(m)); sum(is.na(mc))
+
+# Checking Variables that are highly correlated
+highlyCorrelated = findCorrelation(mc, cutoff=0.7)
+#Identifying Variable Names of Highly Correlated Variables
+highlyCorCol = colnames(mc)[highlyCorrelated]
+highlyCorCol
+```
+
+```{r}
+# Check the Results using VIF
+fit1 <- lm(totalTrips ~., data = b1); summary(fit1)
+vif(fit1)
+```
+
+```{r}
+# Remove highly correlated variables 
+cols <- c("feelslike")
+b1 <- b1 %>% select(everything(), - all_of(cols))
+names(b1)
+```
+
+```{r}
+# Assessing Outliers
+par(mfrow=c(4,1))
+options(repr.plot.width=16, repr.plot.height=7)
+boxplot(b1$totalTrips, col = "grey40", horizontal = T, main = "totalTrips") 
+boxplot(b1$temp, col = "grey40", horizontal = T, main ="temp")
+boxplot(b1$humidity, col = "grey40", horizontal = T, main = "humidity") 
+boxplot(b1$windspeed, col = "grey40", horizontal = T, main = "windspeed") 
+boxplot(b1$visibility, col = "grey40", horizontal = T, main = "visibility") 
+boxplot(b1$uvindex, col = "grey40", horizontal = T, main ="uvindex")
+boxplot(b1$humidity, col = "grey40", horizontal = T, main = "humidity") 
+boxplot(b1$totalCrimes, col = "grey40", horizontal = T, main = "totalCrimes") 
+
+par(mfrow=c(1,1))
+```
+
+```{r}
+# Removing Outliers
+# There are not much outliers (atleast for weather data) 
+# Removing outliers for visibility 
+```
+
+```{r}
+Q <- quantile(b1$visibility, probs=c(.25, .75), na.rm = T)
+# this is the data inside of the boxplot
+iqr <- IQR(b1$visibility, na.rm = T)
+
+# remove the outlier beyond 1.5 * iqr for visibility
+df <- b1 %>% filter(visibility > (Q[1] - 1.5*iqr) & 
+                     visibility < (Q[2] + 1.5*iqr))  
+
+# visualize the new dataset without outliers
+par(mfrow=c(2,1))
+options(repr.plot.width=16, repr.plot.height=6)
+boxplot(b1$visibility, col = "grey40", horizontal = T, 
+        main = "visibility - Before Removing Outliers")
+boxplot(df$visibility, col = "thistle2", horizontal = T, 
+        main = "visibility - After Removing Outliers")
+par(mfrow=c(1,1))
+```
+
+
+```{r}
+# Splitting the dataset into the Training set and Test set 
+set.seed(123)
+split = sample.split(df$totalTrips, SplitRatio = 0.75)
+training_set = subset(df, split == TRUE)
+test_set = subset(df, split == FALSE)
+
+```
+
+```{r}
+m1 <- df %>% select(totalTrips, 
+            temp, 
+            humidity, 
+            windspeed,
+            visibility,
+            uvindex,
+            totalCrimes,
+            ) %>% lm() 
+   
+summary(m1)
+
+```
+
+```{r}
+# check anova for F value significance
+anova(m1) 
+```
+
+```{r}
+summary(m1)[9]
+```
+
+```{r}
+# Decision Tree Regression
+# Fitting Decision Tree Regression to the dataset
+
+m2 = rpart(formula = totalTrips ~ .,
+           data = training_set,
+           method = "anova")
+par(mfrow = c(1,1))
+prp(m2, main = "Decision Tree")
+```
+
+```{r}
+ # Growing the Decision Tree
+prn = rpart(formula = totalTrips ~ .,
+            data = training_set,
+            method = "anova")
+
+# Print the Complexity Table 
+printcp(prn)
+```
+
+```{r}
+# Pruning the tree
+# using lowest complexity error from the cp table
+
+ocp = prn$cptable[which.min(prn$cptable[,"xerror"]), "CP"]
+
+m3 <- prune(prn, ocp)
+
+# compare the before and after pruning models
+par(mfrow = c(1,1))
+prp(m3, main = "Model after Pruning")
+```
+
+```{r}
+# Random Forest Regression
+set.seed(1234)
+m4 = rpart(formula = totalTrips ~ .,
+           data = training_set,
+           method = "anova")
+
+prp(m4, main = "Random Forest Regression");
+```
+
+```{r}
+# Support Vector Machines
+m5 = svm(formula = totalTrips ~ .,
+         data = training_set,
+         type = 'eps-regression',
+         kernel = 'linear')
+
+summary(m5)
+```
+
+```{r}
+# tuning the Model to Improve Accuracy
+#sample the data
+s1 = sample_frac(df, size = .3, replace = F)
+
+# using 10 fold Cross Validation
+t1 <- tune(svm, totalTrips ~ ., data = s1, 
+           ranges = list(gamma = 2^(-1:1), cost = 2^(2:4)),
+           tunecontrol = tune.control(sampling = "fix"))
+```
+
+```{r}
+# gamma as a sequence = seq(0.001, 1, length = 10)
+t2 <- tune(svm, totalTrips ~ ., data = s1, 
+           ranges = list(gamma = seq(0.001, 1, length = 10), 
+                         cost = 2^(2:4)),
+           tunecontrol = tune.control(sampling = "fix"))
+```
+
+```{r}
+# applying the tuned SVM to the Training set
+# apply the tuned paramemeters
+m6 = svm(formula = totalTrips ~ .,
+         data = training_set,
+         type = 'eps-regression',
+         kernel = 'radial',
+         gamma = 0.5,
+         cost = 0.1)
+
+summary(m6)
+```
+
+```{r}
+# apply the tuned paramemeters
+m7 = svm(formula = totalTrips ~ .,
+         data = training_set,
+         type = 'eps-regression',
+         kernel = 'radial',
+         gamma = 0.112,
+         cost = 0.1)
+
+summary(m7)
+```
+
+```{r}
+# Predicting the Test set results
+y_pred1 = predict(m1, newdata = test_set);
+y_pred2 = predict(m2, newdata = test_set); 
+y_pred3 = predict(m3, newdata = test_set);
+y_pred4 = predict(m4, newdata = test_set); 
+y_pred5 = predict(m5, newdata = test_set); 
+y_pred6 = predict(m6, newdata = test_set); 
+y_pred7 = predict(m7, newdata = test_set);
+```
+
+```{r}
+# MSE, Variance , R Squared Value
+#------ model 1  --------
+MSE1 = sum((y_pred1 - test_set$totalTrips)^2)/nrow(test_set)
+var.y1 = sum((test_set$totalTrips - mean(test_set$totalTrips))^2)/(nrow(test_set)-1)
+Rsqr1 = 1 - (MSE1/var.y1)
+
+#------ model 2  --------
+MSE2 = sum((y_pred2 - test_set$totalTrips)^2)/nrow(test_set)
+var.y2 = sum((test_set$totalTrips - mean(test_set$totalTrips))^2)/(nrow(test_set)-1)
+Rsqr2 = 1 - (MSE2/var.y2)
+
+#------ model 3  --------
+MSE3 = sum((y_pred3 - test_set$totalTrips)^2)/nrow(test_set)
+var.y3 = sum((test_set$totalTrips - mean(test_set$totalTrips))^2)/(nrow(test_set)-1)
+Rsqr3 = 1 - (MSE3/var.y3)
+
+#------ model 4  --------
+MSE4 = sum((y_pred4 - test_set$totalTrips)^2)/nrow(test_set)
+var.y4 = sum((test_set$totalTrips - mean(test_set$totalTrips))^2)/(nrow(test_set)-1)
+Rsqr4 = 1 - (MSE4/var.y4)
+
+#------ model 5  --------
+MSE5 = sum((y_pred5 - test_set$totalTrips)^2)/nrow(test_set)
+var.y5 = sum((test_set$totalTrips - mean(test_set$totalTrips))^2)/(nrow(test_set)-1)
+Rsqr5 = 1 - (MSE5/var.y5)
+
+#------ model 6  --------
+MSE6 = sum((y_pred6 - test_set$totalTrips)^2)/nrow(test_set)
+var.y6 = sum((test_set$totalTrips - mean(test_set$totalTrips))^2)/(nrow(test_set)-1)
+Rsqr6 = 1 - (MSE6/var.y6)
+
+#------ model 7  --------
+MSE7 = sum((y_pred7 - test_set$totalTrips)^2)/nrow(test_set)
+var.y7 = sum((test_set$totalTrips - mean(test_set$totalTrips))^2)/(nrow(test_set)-1)
+Rsqr7 = 1 - (MSE7/var.y7)
+```
+
+```{r}
+# Accuracy of Models
+cat("\n Model 1 = ", MSE1, " Variance  = ", var.y1, "R Squared = ", Rsqr1);
+cat("\n Model 2 = ", MSE2, " Variance  = ", var.y2, "R Squared = ", Rsqr2);
+cat("\n Model 3 = ", MSE3, " Variance  = ", var.y3, "R Squared = ", Rsqr3);
+cat("\n Model 4 = ", MSE4, " Variance  = ", var.y4, "R Squared = ", Rsqr4);
+cat("\n Model 5 = ", MSE5, " Variance  = ", var.y5, "R Squared = ", Rsqr5);
+cat("\n Model 6 = ", MSE6, " Variance  = ", var.y6, "R Squared = ", Rsqr6);
+cat("\n Model 7 = ", MSE7, " Variance  = ", var.y7, "R Squared = ", Rsqr7);
+```
+
+
+
