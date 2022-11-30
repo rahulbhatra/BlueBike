@@ -1,0 +1,129 @@
+***We are Mergin the whole trip data into one big trip data over here from year 2015 - 2022***
+
+```{r}
+rm(tripData)
+rows = c("tripduration", "starttime", "stoptime", "start.station.id", "start.station.name", "start.station.latitude", "start.station.longitude", "end.station.id", "end.station.name", "end.station.latitude", "end.station.longitude", "bikeid", "usertype")
+tripData = data.frame()
+tripData = rbind(tripData, read.csv("/Users/dipenchawla/Desktop/DIPEN_DPA/Project/dipen/2015-tripdata.csv")[rows])
+tripData = rbind(tripData, read.csv("/Users/dipenchawla/Desktop/DIPEN_DPA/Project/dipen/2016-tripdata.csv")[rows])
+tripData = rbind(tripData, read.csv("/Users/dipenchawla/Desktop/DIPEN_DPA/Project/dipen/2017-tripdata.csv")[rows])
+tripData = rbind(tripData, read.csv("/Users/dipenchawla/Desktop/DIPEN_DPA/Project/dipen/2018-tripdata.csv")[rows])
+tripData = rbind(tripData, read.csv("/Users/dipenchawla/Desktop/DIPEN_DPA/Project/dipen/2019-tripdata.csv")[rows])
+tripData = rbind(tripData, read.csv("/Users/dipenchawla/Desktop/DIPEN_DPA/Project/dipen/2020-tripdata.csv")[rows])
+tripData = rbind(tripData, read.csv("/Users/dipenchawla/Desktop/DIPEN_DPA/Project/dipen/2021-tripdata.csv")[rows])
+tripData = rbind(tripData, read.csv("/Users/dipenchawla/Desktop/DIPEN_DPA/Project/dipen/2022-tripdata.csv")[rows])
+head(tripData)
+```
+
+***Counting number of trips by date***
+
+```{r}
+library(dplyr)
+library(ggplot2)
+tripData$date = as.Date(tripData$starttime, "%Y-%m-%d")
+
+numberOfTrips = tripData %>% group_by(date) %>% 
+  summarise(totalTrips=length(bikeid),
+            .groups = 'drop')
+numberOfTrips
+dtrip = select(numberOfTrips,totalTrips)
+
+ggp = ggplot(data = numberOfTrips) + 
+  geom_line(aes(x = date, y = totalTrips), color = 2) + 
+  xlab("Year") + ylab("Total Number of Trips") + ggtitle("Date Vs Number of Trips")
+ggp
+```
+
+```{r}
+crimeData = read.csv("/Users/dipenchawla/Desktop/DIPEN_DPA/Project/crimedata.csv")
+head(crimeData)
+crimeData
+```
+
+***Getting the Crime Count occured on a date***
+```{r}
+library(dplyr)
+library(ggplot2)
+crimeData$OCCURRED_ON_DATE = as.Date(crimeData$OCCURRED_ON_DATE, "%Y-%m-%d")
+crimeCount = crimeData %>% group_by(OCCURRED_ON_DATE) %>% 
+  summarise(totalCrimes=length(INCIDENT_NUMBER),
+            .groups = 'drop')
+crimeData
+crimeCount = crimeCount[crimeCount$OCCURRED_ON_DATE >= as.Date("2015-01-01") & crimeCount$OCCURRED_ON_DATE <= as.Date("2022-12-31"), ]
+length(crimeCount$totalCrimes)
+length(crimeCount$OCCURRED_ON_DATE)
+# plot(x = crimeCount$OCCURRED_ON_DATE, y = crimeCount$totalCrimes, xlab = "Month of the Year", ylab = "Total Number of Crimes", type = "l", main = "Date Vs Number of Crimes")
+ggp = ggplot(data = crimeCount) +
+  geom_line(aes(x = OCCURRED_ON_DATE, y = totalCrimes), color = 4) +
+  xlab("Year") + ylab("Tatal Number of Crimes")
+ggp
+```
+
+
+***Read CSV***
+```{r}
+weatherData = read.csv("/Users/dipenchawla/Desktop/DIPEN_DPA/Project/weather.csv")
+```
+
+```{r}
+dim(numberOfTrips)
+data = merge(numberOfTrips, crimeCount, by.x = "date", by.y = "OCCURRED_ON_DATE")
+dim(data)
+cat("Total Number of na fields in the dataset", sum(is.na(data)))
+
+data = merge(data, weatherData, by.x = "date", by.y ="datetime", all.x = TRUE)
+dim(data)
+cat("Total Number of na fields in the dataset", sum(is.na(data)))
+
+sum(is.na(data$totalCrimes))
+sum(is.na(data$temp))
+sum(is.na(data$humidity))
+sum(is.na(data$windspeed))
+sum(is.na(data$visibility))
+sum(is.na(data$feelslike))
+sum(is.na(data$uvindex))
+
+
+data
+
+
+timeSlices <- createTimeSlices(1:nrow(data), 
+                   initialWindow = 36, horizon = 12, fixedWindow = TRUE)
+
+
+trainSlices <- timeSlices[[1]]
+testSlices <- timeSlices[[2]]
+
+plsFitTime <- train(numberOfTrips$totalTrips ~ data$temp + data$totalCrimes + data$humidity + data$windspeed + data$visibility + data$feelslike + data$uvindex,
+                   data = data[trainSlices,],
+                    method = "pls",
+                    preProc = c("center", "scale"))
+
+pred <- predict(plsFitTime,data[testSlices[[1]],])
+
+true <- data$totalTrips[testSlices[[1]]]
+
+plot(true, col = "red", ylab = "true (red) , pred (blue)", ylim = range(c(pred,true)))
+points(pred, col = "blue") 
+
+#for(i in 1:length(trainSlices)){
+#trainSlices <- timeSlices[[i]]
+#testSlices <- timeSlices[[i]]
+#plsFitTime <- train(numberOfTrips$totalTrips ~ data$temp + data$totalCrimes + data$humidity + data$windspeed + data$visibility + data$feelslike + data$uvindex,
+#                    data = data[trainSlices,],
+#                    method = "pls",
+#                    preProc = c("center", "scale"))
+#pred <- predict(plsFitTime,data[testSlices,])
+  
+  
+#true <- data$totalTrips[testSlices[[i]]]
+#plot(true, col = "red", ylab = "true (red) , pred (blue)", main = i, ylim = range(c(pred,true)))
+#points(pred, col = "blue") 
+#}
+
+
+
+
+
+```
+
