@@ -98,6 +98,7 @@ write.csv(weatherData, "WeatherData/weather.csv")
 ***Read CSV if got already written.***
 ```{r}
 weatherData = read.csv("WeatherData/weather.csv")
+weatherData
 ```
 
 ```{r}
@@ -107,6 +108,7 @@ data = merge(numberOfTrips, crimeCount, by.x = "date", by.y = "OCCURRED_ON_DATE"
 dim(data)
 cat("Total Number of na fields in the dataset", sum(is.na(data)))
 
+weatherData$datetime = as.Date(weatherData$datetime)
 data = merge(data, weatherData, by.x = "date", by.y ="datetime", all.x = TRUE)
 dim(data)
 cat("Total Number of na fields in the dataset", sum(is.na(data)))
@@ -121,6 +123,16 @@ sum(is.na(data$uvindex))
 
 
 data
+```
+
+***Write the merged data into one big file. Now you can just get if from over here***
+```{r}
+write.csv(data, "MergedData/data.csv")
+```
+
+***Read CSV if got already written.***
+```{r}
+data = read.csv("MergedData/data.csv")
 ```
 
 ```{r}

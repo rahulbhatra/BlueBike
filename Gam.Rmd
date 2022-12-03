@@ -1,8 +1,13 @@
 ---
 title: "GAM"
-output: rmarkdown::github_document
 date: "2022-11-21"
 ---
+
+***Read CSV if got already written.***
+```{r}
+rm(list = ls())
+data = read.csv("MergedData/data.csv")
+```
 
 ```{r}
 head(data)
@@ -47,10 +52,11 @@ predicted
 plot = data.frame(test$date, test$totalTrips, predicted)
 plot
 
+
 head(plot)
 ggp = ggplot(data = plot) + 
-  geom_line(aes(x = test.date, y = test.totalTrips, colour = "Test Total Trips")) + 
-  geom_line(aes(x = test.date, y = predicted, colour = "GAM Fit Total Trips")) +
+  geom_line(aes(x = test.date, y = test.totalTrips, colour = "Test Total Trips", group = 1)) + 
+  geom_line(aes(x = test.date, y = predicted, colour = "GAM Fit Total Trips", group = 1)) +
   scale_color_manual(name = "Test vs Predictions", values = c("Test Total Trips" = 2, "GAM Fit Total Trips" = 3))
 ggp
 ```
@@ -70,9 +76,9 @@ for(i in 1:1809) seeds[[i]] <- sample.int(1000, 5, replace = FALSE)
 registerDoParallel(cores=3)
 
 myTimeControl <- trainControl(method = "timeslice",
-                              initialWindow = 500,
-                              horizon = 100,
-                              fixedWindow = FALSE,
+                              initialWindow = 1600,
+                              horizon = 50,
+                              fixedWindow = TRUE,
                               allowParallel = TRUE,
                               seeds = seeds)
 
@@ -90,7 +96,7 @@ glmnet.mod <- train(totalTrips ~ temp + totalCrimes + humidity + windspeed + vis
                     method = "glmnet",
                     family = "gaussian",
                     trControl = myTimeControl,
-                    tuneLength=tuneLength.num,
+                    tuneLength = tuneLength.num,
                     metric='RMSE'
                 )
 summary(glmnet.mod)
@@ -108,8 +114,8 @@ dim(glmnet.pred)
 glmnet.pred
 
 ggp = ggplot(data = test) + 
-  geom_line(aes(x = date, y = totalTrips, colour = "Test Total Trips")) +
-  geom_line(aes(x = date, y = glmnet.pred, colour = "Reg. LR Total Trips")) + 
+  geom_line(aes(x = date, y = totalTrips, colour = "Test Total Trips", group=1)) +
+  geom_line(aes(x = date, y = glmnet.pred, colour = "Reg. LR Total Trips", group=1)) + 
   scale_color_manual(name = "Test vs Predictions", values = c("Test Total Trips" = 2, "Reg. LR Total Trips" = 3))
 ggp
 
@@ -117,17 +123,24 @@ cat("Train RMSE for glmnet", mean(glmnet.mod$results$RMSE))
 cat("Test RMSE for glmnet", sqrt(mean((glmnet.pred - test$totalTrips)^2)))
 ```
 
-***Regularized Poisson Regression***
+***Random Forest Regression***
 
 ```{r}
-pois.mod <- train(totalTrips ~ temp + totalCrimes + humidity + windspeed + visibility + feelslike + uvindex,
-                    data = train,
-                    method = "glmnet",
-                    family = "poisson",
-                    trControl = myTimeControl,
-                    tuneLength = tuneLength.num,
-                    metric='RMSE')
-pois.mod
+trainX <- train[, c("temp", "humidity", "windspeed", "visibility", "feelslike", "uvindex")]
+trainX
+trainY <- train[ , c("totalTrips")]
+trainY
+  
+rf.mod <- train(trainX = trainX,
+                trainY = trainy,
+                method = "rf",
+                trControl = myTimeControl,
+                tuneLength=tuneLength.num,
+                num.tree = 1000,
+                metric='RMSE')
+summary(rf.mod)
+plot(rf.mod)
+rf.mod
 ```
 
 ***Testing the model (Regularized Poisson Regression) and plotting it's results over here.***
@@ -136,7 +149,7 @@ pois.mod
 pois.mod$bestTune
 bestlam = pois.mod$bestTune$lambda
 bestlam
-pois.pred = predict(pois.mod$finalModel, s = bestlam, newx = newx)
+pois.pred = predict(pois.mod$finalModel, newx)
 dim(pois.pred)
 pois.pred
 
@@ -154,7 +167,7 @@ cat("Test RMSE for glmnet", sqrt(mean((pois.pred - test$totalTrips)^2)))
 *Training the Gam Model.*
 
 ```{r}
-train
+library(mgcv)
 gam.mod <- train(totalTrips ~ temp + totalCrimes + humidity + windspeed + visibility + feelslike + uvindex,
                    data = train,
                    method = "gam",
@@ -169,29 +182,28 @@ gam.mod
 ***Testing the model (Gam) and plotting it's results over here.***
 
 ```{r}
-gam.mod$bestTune
-gam.bestlam = gam.mod$bestTune$lambda
-gam.bestlam
-gam.pred = predict(gam.mod$finalModel, s = gam.bestlam, newx = newx)
+newx
+gam.pred = predict(gam.mod, newx)
 dim(gam.pred)
 gam.pred
 
 ggp = ggplot(data = test) + 
-  geom_line(aes(x = date, y = totalTrips, colour = "Test Total Trips")) +
-  geom_line(aes(x = date, y = glmnet.pred, colour = "Reg. LR Total Trips")) +
-  geom_line(aes(x = date, y = gam.pred, colour = "Gam Total Trips")) + 
+  geom_line(aes(x = date, y = totalTrips, colour = "Test Total Trips", group=1)) +
+  geom_line(aes(x = date, y = glmnet.pred, colour = "Reg. LR Total Trips", group=1)) +
+  geom_line(aes(x = date, y = gam.pred, colour = "Gam Total Trips", group=1)) + 
   scale_color_manual(name = "Test vs Predictions", values = c("Test Total Trips" = 2, "Reg. LR Total Trips" = 3, "Gam Total Trips" = 4))
 ggp
 
 cat("Train RMSE for glmnet", mean(gam.mod$results$RMSE))
-cat("Test RMSE for glmnet", sqrt(mean((gam.mod - test$totalTrips)^2)))
+cat("Test RMSE for glmnet", sqrt(mean((gam.pred - test$totalTrips)^2)))
 ```
 
 
 \_\* Comparing the models over here.\*\_
 
 ```{r}
-resamps <- resamples(list(glmnet = glmnet.mod, glmnet.pois = pois.mod, gam=gam.mod))
+# resamps <- resamples(list(glmnet = glmnet.mod, glmnet.pois = pois.mod, gam=gam.mod))
+resamps <- resamples(list(glmnet = glmnet.mod, gam=gam.mod))
 ss <- summary(resamps)
 knitr::kable(ss[[3]]$RMSE)
 ```
