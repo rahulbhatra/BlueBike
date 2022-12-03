@@ -123,45 +123,41 @@ cat("Train RMSE for glmnet", mean(glmnet.mod$results$RMSE))
 cat("Test RMSE for glmnet", sqrt(mean((glmnet.pred - test$totalTrips)^2)))
 ```
 
-***Random Forest Regression***
+***Regression Tree***
 
 ```{r}
-trainX <- train[, c("temp", "humidity", "windspeed", "visibility", "feelslike", "uvindex")]
-trainX
-trainY <- train[ , c("totalTrips")]
-trainY
-  
-rf.mod <- train(trainX = trainX,
-                trainY = trainy,
-                method = "rf",
-                trControl = myTimeControl,
-                tuneLength=tuneLength.num,
-                num.tree = 1000,
-                metric='RMSE')
-summary(rf.mod)
-plot(rf.mod)
-rf.mod
+rpart.mod <- train(totalTrips ~ temp + totalCrimes + humidity + windspeed + visibility + feelslike + uvindex,
+              data = train,
+              method = "rpart",
+              trControl = myTimeControl,
+              tuneLength=tuneLength.num,
+              metric='RMSE'
+                )
+summary(rpart.mod)
+plot(rpart.mod)
+rpart.mod
 ```
 
-***Testing the model (Regularized Poisson Regression) and plotting it's results over here.***
+***Testing the model (Testing Regression Tree) and plotting it's results over here.***
 
 ```{r}
-pois.mod$bestTune
-bestlam = pois.mod$bestTune$lambda
-bestlam
-pois.pred = predict(pois.mod$finalModel, newx)
-dim(pois.pred)
-pois.pred
+library(rpart)
+library(rpart.plot)
+
+rpart.mod
+rpart.pred = predict(rf.mod, newx)
+length(rpart.pred)
+rpart.pred
 
 ggp = ggplot(data = test) + 
-  geom_line(aes(x = date, y = totalTrips, colour = "Test Total Trips")) +
-  # geom_line(aes(x = date, y = glmnet.pred, colour = "Reg. LR Total Trips")) + 
-  geom_line(aes(x = date, y = pois.pred, colour = "Poisson Total Trips")) + 
-  scale_color_manual(name = "Test vs Predictions", values = c("Test Total Trips" = 2, "Reg. LR Total Trips" = 3, "Poission Total Trips" = 4))
+  geom_line(aes(x = date, y = totalTrips, colour = "Test Total Trips", group = 1)) +
+  geom_line(aes(x = date, y = glmnet.pred, colour = "Reg. LR Total Trips", group=1)) +
+  geom_line(aes(x = date, y = rpart.pred, colour = "Regression Tree Total Trips", group = 1)) + 
+  scale_color_manual(name = "Test vs Predictions", values = c("Test Total Trips" = 2, "Reg. LR Total Trips" = 3, "Regression Tree Total Trips" = 4))
 ggp
 
-cat("Train RMSE for glmnet", mean(pois.mod$results$RMSE))
-cat("Test RMSE for glmnet", sqrt(mean((pois.pred - test$totalTrips)^2)))
+cat("Train RMSE for glmnet", mean(rpart.mod$results$RMSE))
+cat("Test RMSE for glmnet", sqrt(mean((rpart.pred - test$totalTrips)^2)))
 ```
 
 *Training the Gam Model.*
@@ -203,7 +199,7 @@ cat("Test RMSE for glmnet", sqrt(mean((gam.pred - test$totalTrips)^2)))
 
 ```{r}
 # resamps <- resamples(list(glmnet = glmnet.mod, glmnet.pois = pois.mod, gam=gam.mod))
-resamps <- resamples(list(glmnet = glmnet.mod, gam=gam.mod))
+resamps <- resamples(list(glmnet = glmnet.mod, gam=gam.mod, rf=rf.mod))
 ss <- summary(resamps)
 knitr::kable(ss[[3]]$RMSE)
 ```
