@@ -5,58 +5,17 @@ date: "2022-11-22"
 ---
 ***Install all required packages***
 ```{r}
-install.packages("dplyr")
-install.packages("caret")
-install.packages("gridExtra")
-install.packages("e1071")
-```
+library("dplyr")
+library("caret")
+library("gridExtra")
+library("e1071")
+library("tidyverse")
+library("doParallel")
+library("lattice")
+library("pdp")
 
-***Trip Data***
-```{r}
-tripData = read.csv("TripData/tripdata.csv")
-head(tripData)
-library(dplyr)
-tripData$date = as.Date(tripData$starttime, "%Y-%m-%d")
-
-numberOfTrips = tripData %>% group_by(date) %>% 
-  summarise(totalTrips=length(bikeid),
-            .groups = 'drop')
-numberOfTrips
-plot(x = numberOfTrips$date, y = numberOfTrips$totalTrips, xlab = "Month of the Year", ylab = "Total Number of Trips", type = "l", main = "Date Vs Number of Trips")
 ```
-***Crime data***
-```{r}
-crimeData = read.csv("CrimeData/crimedata.csv")
-head(crimeData)
-library(dplyr)
-crimeData$OCCURRED_ON_DATE = as.Date(crimeData$OCCURRED_ON_DATE, "%Y-%m-%d")
-crimeCount = crimeData %>% group_by(OCCURRED_ON_DATE) %>% 
-  summarise(totalCrimes=length(INCIDENT_NUMBER),
-            .groups = 'drop')
-crimeData
-crimeCount = crimeCount[crimeCount$OCCURRED_ON_DATE >= as.Date("2015-01-01") & crimeCount$OCCURRED_ON_DATE <= as.Date("2022-12-31"), ]
-length(crimeCount$totalCrimes)
-length(crimeCount$OCCURRED_ON_DATE)
-plot(x = crimeCount$OCCURRED_ON_DATE, y = crimeCount$totalCrimes, xlab = "Month of the Year", ylab = "Total Number of Crimes", type = "l", main = "Date Vs Number of Crimes")
-```
-***Weather data***
-```{r}
-weatherData = read.csv("WeatherData/weather.csv")
-weatherData$datetime = as.Date(weatherData$datetime, "%Y-%m-%d")
-head(weatherData)
-```
-***Merge dataset***
-```{r}
-rm(data)
-data = merge(numberOfTrips, crimeCount, by.x = "date", by.y = "OCCURRED_ON_DATE")
-data = merge(data, weatherData, by.x = "date", by.y ="datetime")
-data
-```
-*** Backup of the final clubbed dataset***
-```{r}
-write.csv(data, "Data/data.csv")
-```
-*** Read data.csv***
+***Read data.csv***
 ```{r}
 data = read.csv("Data/data.csv")
 ```
@@ -64,41 +23,74 @@ data = read.csv("Data/data.csv")
 ```{r}
 library(caret)
 head(data)
-test_train_split <- createDataPartition(y = data$totalTrips, p = 0.8, list = FALSE)
-train <- data[test_train_split,]
-test <- data[-test_train_split,]
+# test_train_split <- createDataPartition(y = data$totalTrips, p = 0.8, list = FALSE)
+# train <- data[test_train_split,]
+# test <- data[-test_train_split,]
+trainIndex <- c(seq(1, 0.8*nrow(data)))
+testIndex <- c(seq(0.8*nrow(data) + 1, nrow(data)))
+
+train  <- data[trainIndex, ]
+test   <- data[testIndex, ]
+head(train)
+tail(train)
+head(test)
+tail(test)
 ```
-***We fit a polynomial regression model***
+***We fit a simple polynomial regression model***
 ```{r}
-poly.model <- lm(data = train, totalTrips ~ polym(temp, totalCrimes, humidity, snow, windspeed, visibility, degree = 2, raw = TRUE))
-summary(poly.model)
+poly.model <- lm(data = train, totalTrips ~ polym(temp, totalCrimes, humidity, windspeed, visibility, feelslike, uvindex, degree = 2, raw = TRUE))
+poly.model.sse <- sum(fitted(poly.model) - train$totalTrips)^2
+poly.model.ssr <- sum((fitted(poly.model) - mean(train$totalTrips))^2)
+poly.model.rsq <- 1 - (poly.model.sse/(poly.model.sse + poly.model.ssr))
+print(paste("RMSE of polynomial regression model with a degree of 2: ", sqrt(mean(poly.model$residuals^2))))
+print(paste("R-Squared of polynomial regression model with a degree of 2: ", poly.model.rsq))
 ```
 ***Since the Standard error is way too high let us update the model to cubic***
 ```{r}
-cubic.model <- lm(data = train, totalTrips ~ polym(temp, totalCrimes, humidity, snow, windspeed, visibility, degree = 3, raw = TRUE))
-summary(cubic.model)
+cubic.model <- lm(data = train, totalTrips ~ polym(temp, totalCrimes, humidity, windspeed, visibility, feelslike, uvindex, degree = 3, raw = TRUE))
+cubic.model.sse <- sum(fitted(cubic.model) - train$totalTrips)^2
+cubic.model.ssr <- sum((fitted(cubic.model) - mean(train$totalTrips))^2)
+cubic.model.rsq <- 1 - (cubic.model.sse/(cubic.model.sse + cubic.model.ssr))
+print(paste("RMSE of polynomial regression model with a degree of 3: ", sqrt(mean(cubic.model$residuals^2))))
+print(paste("R-Squared of polynomial regression model with a degree of 3: ", cubic.model.rsq))
 ```
 ***We have seen a reduction in the residual standard error, let us increase the degree further more, degree = 4***
 ```{r}
-deg4.model <- lm(data = train, totalTrips ~ polym(temp, totalCrimes, humidity, snow, windspeed, visibility, degree = 4, raw = TRUE))
-summary(deg4.model)
+deg4.model <- lm(data = train, totalTrips ~ polym(temp, totalCrimes, humidity, windspeed, visibility, feelslike, uvindex, degree = 4, raw = TRUE))
+deg4.model.sse <- sum(fitted(deg4.model) - train$totalTrips)^2
+deg4.model.ssr <- sum((fitted(deg4.model) - mean(train$totalTrips))^2)
+deg4.model.rsq <- 1 - (deg4.model.sse/(deg4.model.sse + deg4.model.ssr))
+print(paste("RMSE of polynomial regression model with a degree of 4: ", sqrt(mean(deg4.model$residuals^2))))
+print(paste("R-Squared of polynomial regression model with a degree of 4: ", deg4.model.rsq))
 ```
 ***Let us see if we can reduce the training residual error even more, degree=5***
 ```{r}
-deg5.model <- lm(data = train, totalTrips ~ polym(temp, totalCrimes, humidity, snow, windspeed, visibility, degree = 5, raw = TRUE))
-summary(deg5.model)
+deg5.model <- lm(data = train, totalTrips ~ polym(temp, totalCrimes, humidity, windspeed, visibility, feelslike, uvindex, degree = 5, raw = TRUE))
+deg5.model.sse <- sum(fitted(deg5.model) - train$totalTrips)^2
+deg5.model.ssr <- sum((fitted(deg5.model) - mean(train$totalTrips))^2)
+deg5.model.rsq <- 1 - (deg5.model.sse/(deg5.model.sse + deg5.model.ssr))
+print(paste("RMSE of polynomial regression model with a degree of 5: ", sqrt(mean(deg5.model$residuals^2))))
+print(paste("R-Squared of polynomial regression model with a degree of 5: ", deg5.model.rsq))
 ```
 ***degree=6***
 ```{r}
-deg6.model <- lm(data = train, totalTrips ~ polym(temp, totalCrimes, humidity, snow, windspeed, visibility, degree = 6, raw = TRUE))
-summary(deg6.model)
+deg6.model <- lm(data = train, totalTrips ~ polym(temp, totalCrimes, humidity, windspeed, visibility, feelslike, uvindex, degree = 6, raw = TRUE))
+deg6.model.sse <- sum(fitted(deg6.model) - train$totalTrips)^2
+deg6.model.ssr <- sum((fitted(deg6.model) - mean(train$totalTrips))^2)
+deg6.model.rsq <- 1 - (deg6.model.sse/(deg6.model.sse + deg6.model.ssr))
+print(paste("RMSE of polynomial regression model with a degree of 6: ", sqrt(mean(deg6.model$residuals^2))))
+print(paste("R-Squared of polynomial regression model with a degree of 6: ", deg6.model.rsq))
 ```
 ***Let us observe if the residual standard error increases further if we increase the degree to 7***
 ```{r}
-deg7.model <- lm(data = train, totalTrips ~ polym(temp, totalCrimes, humidity, snow, windspeed, visibility, degree = 7, raw = TRUE))
-summary(deg7.model)
+deg7.model <- lm(data = train, totalTrips ~ polym(temp, totalCrimes, humidity, windspeed, visibility, feelslike, uvindex, degree = 7, raw = TRUE))
+deg7.model.sse <- sum(fitted(deg7.model) - train$totalTrips)^2
+deg7.model.ssr <- sum((fitted(deg7.model) - mean(train$totalTrips))^2)
+deg7.model.rsq <- 1 - (deg7.model.sse/(deg7.model.sse + deg7.model.ssr))
+print(paste("RMSE of polynomial regression model with a degree of 7: ", sqrt(mean(deg7.model$residuals^2))))
+print(paste("R-Squared of polynomial regression model with a degree of 7: ", deg7.model.rsq))
 ```
-***By increase in polynomial degree, the overall standard error is increasing. Therefore, let us visualize the data and decide which one has a non-linear relation with the response variable and plot the same***
+***By increase in polynomial degree, the overall standard error is increasing, due to unavailability of degrees of freedom. Therefore, let us visualize the data and decide which one has a non-linear relation with the response variable and plot the same***
 ```{r}
 library(gridExtra)
 ggp_temp <- ggplot(data = data, aes(x = totalTrips, y = temp)) +
@@ -107,53 +99,109 @@ ggp_crimes <- ggplot(data = data, aes(x = totalTrips, y = totalCrimes)) +
   geom_point(color = "blue") + ggtitle("Trips v/s Crimes") + xlab("totalTrips") + ylab("Crimes")
 ggp_humidity <- ggplot(data = data, aes(x = totalTrips, y = humidity)) +
   geom_point(color = "green") +  ggtitle("Trips v/s Humidity") + xlab("totalTrips") + ylab("Humidity")
-ggp_snow <- ggplot(data = data, aes(x = totalTrips, y = snow)) +
-  geom_point(color = "yellow") +  ggtitle("Trips v/s Snow") + xlab("totalTrips") + ylab("Snow")
 ggp_windspeed <- ggplot(data = data, aes(x = totalTrips, y = windspeed)) +
   geom_point(color = "orange") +  ggtitle("Trips v/s WindSpeed") + xlab("totalTrips") + ylab("WindSpeed")
 ggp_visibility <- ggplot(data = data, aes(x = totalTrips, y = visibility)) +
   geom_point(color = "black") +  ggtitle("Trips v/s Visibility") + xlab("totalTrips") + ylab("Visibility")
+ggp_feelslike <- ggplot(data = data, aes(x = totalTrips, y = feelslike)) +
+  geom_point(color = "purple") +  ggtitle("Trips v/s FeelsLike") + xlab("FeelsLike") + ylab("FeelsLike")
+ggp_uvindex <- ggplot(data = data, aes(x = totalTrips, y = uvindex)) +
+  geom_point(color = "pink") +  ggtitle("Trips v/s UVIndex") + xlab("UVIndex") + ylab("UVIndex")
 
-grid.arrange(ggp_temp, ggp_crimes, ggp_humidity, ggp_snow, ggp_windspeed, ggp_visibility, ncol = 3)
+grid.arrange(ggp_temp, ggp_crimes, ggp_humidity, ggp_windspeed, ggp_visibility, ggp_feelslike, ggp_uvindex, ncol = 4)
 ```
 ***We can observe slight non-linear relation for all of the predictors, Let us plot our best model, degree=5, and see if this non-linearity is visible or not.***
 ```{r}
-plot(deg5.model, 1, col = "blue")
+plot(poly.model, 1, col = "blue")
 ```
-***From this we can observe that red line is almost linear close to residuals but deflects at the ends showing non-linearity. This is way too close to linearity of predictors with respect to the response variable. But, due to slight non-linearity among individual predictors, the polynomial regression model is better than the linear model***
+***From this we can observe that red line is almost linear. This is way too close to linearity of predictors with respect to the response variable. According to our assumption, the degree value for polynomial regression is degree 2. After that, we should observe the model overfitting to outliers if any***
 
-***Let us see how our best model is far superior than linear model***
+***Let us see how our best model is far lacking than linear model***
 ```{r}
-best.model <- deg5.model
-anova(lm.fit, best.model)
+best.model <- poly.model
 ```
-***Here Model 1 represents the linear model, while Model 2 corresponds to the larger polynomial model. The null hypothesis is that the two models fit the data equally well, and the alternative hypothesis is that the full model is superior. Here the F-statistic is 2.2172 and the associated p -value is virtually zero. Also, there is a significant reduction in RSS in polynomial model. This provides very clear evidence that the polynomial model is far superior to the linear model. This is not surprising, since earlier we saw evidence for non-linearity in the relationship between totalTrips and predictors: Temp, Crimes, Humidity, Snow, Wind speed, and Visibility.***
-
 ***Let us perform prediction for our best model***
 ```{r}
 poly.predict <- predict(best.model, newdata = test)
-poly.predict
-```
-***We are getting the issue of "Warning: prediction from a rank-deficient fit may be misleading" because we have more model parameters than observations in the dataset***
-```{r}
-str(best.model)
 ```
 ***Let us plot predictions***
 ```{r}
 library(ggplot2)
-# poly.predict
-rm(y)
-ggp1 <-  ggplot(data = test) +
-  geom_point(aes(x = totalTrips, y = temp), color = "red") +
-  geom_point(aes(x = totalTrips, y = totalCrimes), color = "blue") +
-  geom_point(aes(x = totalTrips, y = humidity), color = "green") +
-  geom_point(aes(x = totalTrips, y = snow), color = "yellow") +
-  geom_point(aes(x = totalTrips, y = windspeed), color = "orange") +
-  geom_point(aes(x = totalTrips, y = visibility), color = "black") +
-  stat_smooth(aes(x = totalTrips, y = poly.predict), method = "lm") +
-  ggtitle("totalTrips v/s temp,crimes,humidity,snow,windspeed,visibility") + xlab("totalTrips") + ylab("temp,crimes,humidity,snow,windspeed,visibility")
-ggp1
+plot = data.frame(test$date, test$totalTrips, poly.predict)
+plot
+
+head(plot)
+ggp = ggplot(data = plot) + 
+  geom_line(aes(x = test.date, y = test.totalTrips, colour = "Test Total Trips", group = 1)) + 
+  geom_line(aes(x = test.date, y = poly.predict, colour = "Polynomial Fit Total Trips", group = 1)) +
+  scale_color_manual(name = "Actual vs Predicted", values = c("Test Total Trips" = 5, "Polynomial Fit Total Trips" = 4))
+ggp
+```
+***Let us perform cross validation using trainControl from caret package***
+```{r}
+library(doParallel)
+library(tidyverse)
+library(caret)
+require(ISLR)
+
+set.seed(123)
+seeds <- vector(mode = "list", length = 1809)
+for(i in 1:1809) seeds[[i]] <- sample.int(1000, 5, replace = FALSE)
+registerDoParallel(cores=3)
+
+myTimeControl <- trainControl(method = "timeslice",
+                              initialWindow = 1600,
+                              horizon = 50,
+                              fixedWindow = TRUE,
+                              allowParallel = TRUE,
+                              seeds = seeds)
+```
+***Creating Polynomial Regression Model***
+```{r}
+CV_RMSE <- c()
+for (i in 1:4) {
+poly.mod <- train(y = train$totalTrips,
+                  x = poly(train$temp,
+                           train$totalCrimes,
+                           train$humidity,
+                           train$windspeed,
+                           train$visibility,
+                           train$feelslike,
+                           train$uvindex,
+                           raw = T, simple = T, degree = i),
+                  method = "lm",
+                  metric='RMSE',
+                  trControl = myTimeControl
+                )
+CV_RMSE[i] <- poly.mod$results$RMSE
+print(paste("Iteration Number is: ", i))
+}
+summary(poly.mod)
 ```
 
+```{r}
+data.frame(CV_RMSE = CV_RMSE,degree = 1:4) %>% mutate(min_CV_RMSE = as.numeric(min(CV_RMSE) == CV_RMSE)) %>%
+  ggplot(aes(x = degree, y = CV_RMSE)) +
+  geom_line(col = "blue") +
+  geom_point(size = 2, aes(col = factor(min_CV_RMSE))) +
+  scale_x_continuous(breaks = seq(1, 4), minor_breaks = NULL) +
+  scale_color_manual(values = c("deepskyblue3", "orange")) +
+  theme(legend.position = "none") +
+  labs(title = "Combined Dataset - Polynomial Regression",
+       subtitle = "Selecting the 'WeatherData', 'CrimeData' and 'BlueBikes' with cross-validation",
+       x = "Degree",
+       y = "CV RMSE")
+```
+***This plot shows that the relation between response variable and the predictors is somewhat linear. The polynomial regression with degree 2 might have higher RMSE than linear fit but, we can compare their R-squared values and decide which model is better***
+
+***We can further test by using ANOVA***
+```{r}
+print(paste("RMSE of linear model fit performed by trainControl: ", CV_RMSE[1]))
+print(paste("RMSE of Polynomial model of degree 2 performed by trainControl", CV_RMSE[2]))
+print(paste("RMSE of Polynomial model of degree 3 performed by trainControl", CV_RMSE[3]))
+print(paste("RMSE of Polynomial model of degree 4 performed by trainControl", CV_RMSE[4]))
+```
+
+***Here we can observe that, linear model is a better fit than polynomial regression as the RMSE values for linear are much lower in comparison to polynomial model***
 
 
