@@ -144,6 +144,8 @@ rpart.mod
 library(rpart)
 library(rpart.plot)
 
+plot(rpart.mod)
+
 rpart.mod
 rpart.pred = predict(rf.mod, newx)
 length(rpart.pred)
@@ -178,7 +180,6 @@ gam.mod
 ***Testing the model (Gam) and plotting it's results over here.***
 
 ```{r}
-newx
 gam.pred = predict(gam.mod, newx)
 dim(gam.pred)
 gam.pred
@@ -199,7 +200,7 @@ cat("Test RMSE for glmnet", sqrt(mean((gam.pred - test$totalTrips)^2)))
 
 ```{r}
 # resamps <- resamples(list(glmnet = glmnet.mod, glmnet.pois = pois.mod, gam=gam.mod))
-resamps <- resamples(list(glmnet = glmnet.mod, gam=gam.mod, rf=rf.mod))
+resamps <- resamples(list(glmnet = glmnet.mod, gam=gam.mod, rpart=rpart.mod))
 ss <- summary(resamps)
 knitr::kable(ss[[3]]$RMSE)
 ```

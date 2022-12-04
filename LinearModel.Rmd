@@ -46,7 +46,5 @@ knitr::kable(head(data))
 knitr::kable(tail(data))
 ```
 
-```{r}
-
-```
+Please See file's Gam.Rmd and PolynomialModel.Rmd where we actually used cross validation using time control from caret package.
 

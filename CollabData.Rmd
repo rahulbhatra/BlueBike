@@ -40,7 +40,7 @@ tripData$date = as.Date(tripData$starttime, "%Y-%m-%d")
 numberOfTrips = tripData %>% group_by(date) %>% 
   summarise(totalTrips=length(bikeid),
             .groups = 'drop')
-numberOfTrips
+head(numberOfTrips)
 ggp = ggplot(data = numberOfTrips) + 
   geom_line(aes(x = date, y = totalTrips), color = 2) + 
   xlab("Year") + ylab("Total Number of Trips") + ggtitle("Date Vs Number of Trips")
@@ -66,9 +66,10 @@ crimeCount = crimeCount[crimeCount$OCCURRED_ON_DATE >= as.Date("2015-01-01") & c
 length(crimeCount$totalCrimes)
 length(crimeCount$OCCURRED_ON_DATE)
 # plot(x = crimeCount$OCCURRED_ON_DATE, y = crimeCount$totalCrimes, xlab = "Month of the Year", ylab = "Total Number of Crimes", type = "l", main = "Date Vs Number of Crimes")
+head(crimeCount)
 ggp = ggplot(data = crimeCount) +
   geom_line(aes(x = OCCURRED_ON_DATE, y = totalCrimes), color = 4) +
-  xlab("Year") + ylab("Tatal Number of Crimes")
+  xlab("Year") + ylab("Total Number of Crimes")
 ggp
 ```
 
@@ -121,7 +122,8 @@ sum(is.na(data$visibility))
 sum(is.na(data$feelslike))
 sum(is.na(data$uvindex))
 
-
+str(data)
+head(data)
 data
 ```
 
