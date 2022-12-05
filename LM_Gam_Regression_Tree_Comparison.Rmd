@@ -1,0 +1,211 @@
+---
+title: "GAM"
+date: "2022-11-21"
+---
+
+***Read CSV if got already written.***
+```{r}
+rm(list = ls())
+data = read.csv("MergedData/data.csv")
+```
+
+```{r}
+head(data)
+
+trainIndex <- c(seq(1, 0.8*nrow(data)))
+testIndex <- c(seq(0.8*nrow(data) + 1, nrow(data)))
+
+train  <- data[trainIndex, ]
+test   <- data[testIndex, ]
+test.x = test[c("temp", "totalCrimes", "humidity", "windspeed", "visibility", "feelslike", "uvindex")]
+test.x
+newx = as.matrix(test.x)
+newx
+```
+
+```{r}
+library("mgcv")
+gam.fit = gam(totalTrips ~ temp + totalCrimes + humidity + windspeed + visibility + feelslike + uvindex, data = train)
+summary(gam.fit)
+
+gam.fit.smoothing = gam(totalTrips ~ temp + totalCrimes + humidity + windspeed + visibility + feelslike + uvindex, data = train)
+summary(gam.fit.smoothing)
+```
+
+```{r}
+gam.fit.sse =sum(fitted(gam.fit) - train$totalTrips)^2
+gam.fit.ssr =sum(fitted(gam.fit) -mean(train$totalTrips))^2
+gam.fit.rSquare = 1 - (gam.fit.sse /(gam.fit.ssr + gam.fit.sse))
+cat("The R square GAM is: %s", gam.fit.rSquare)
+
+gam.fit.smoothing.sse =sum(fitted(gam.fit.smoothing) - train$totalTrips)^2
+gam.fit.smoothing.ssr =sum(fitted(gam.fit.smoothing) -mean(train$totalTrips))^2
+gam.fit.smoothing.rSquare = 1 - (gam.fit.smoothing.sse /(gam.fit.smoothing.ssr + gam.fit.smoothing.sse))
+cat("The R square GAM is: %s", gam.fit.smoothing.rSquare)
+```
+
+```{r}
+library("ggplot2")
+predicted = predict(gam.fit, newdata = test)
+predicted
+
+plot = data.frame(test$date, test$totalTrips, predicted)
+plot
+
+
+head(plot)
+ggp = ggplot(data = plot) + 
+  geom_line(aes(x = test.date, y = test.totalTrips, colour = "Test Total Trips", group = 1)) + 
+  geom_line(aes(x = test.date, y = predicted, colour = "GAM Fit Total Trips", group = 1)) +
+  scale_color_manual(name = "Test vs Predictions", values = c("Test Total Trips" = 2, "GAM Fit Total Trips" = 3))
+ggp
+```
+
+
+*Using Cross Validation over here. The initial Window will be of length 500 and test will be of 100*
+
+```{r}
+
+library(tidyverse)
+library(caret)
+library(doParallel)
+
+set.seed(123)
+seeds <- vector(mode = "list", length = 1809)
+for(i in 1:1809) seeds[[i]] <- sample.int(1000, 5, replace = FALSE)
+registerDoParallel(cores=3)
+
+myTimeControl <- trainControl(method = "timeslice",
+                              initialWindow = 1600,
+                              horizon = 50,
+                              fixedWindow = TRUE,
+                              allowParallel = TRUE,
+                              seeds = seeds)
+
+```
+
+
+
+*Regularized Linear Regression*
+
+```{r}
+tuneLength.num <- 5
+
+glmnet.mod <- train(totalTrips ~ temp + totalCrimes + humidity + windspeed + visibility + feelslike + uvindex,
+                    data = train,
+                    method = "glmnet",
+                    family = "gaussian",
+                    trControl = myTimeControl,
+                    tuneLength = tuneLength.num,
+                    metric='RMSE'
+                )
+summary(glmnet.mod)
+plot(glmnet.mod)
+glmnet.mod
+```
+
+***Testing the model (Regularized Linear Regression) and plotting it's results over here.***
+
+```{r}
+bestlam = glmnet.mod$bestTune$lambda
+bestlam
+glmnet.pred = predict(glmnet.mod$finalModel, s = bestlam, newx = newx)
+dim(glmnet.pred)
+glmnet.pred
+
+ggp = ggplot(data = test) + 
+  geom_line(aes(x = date, y = totalTrips, colour = "Test Total Trips", group=1)) +
+  geom_line(aes(x = date, y = glmnet.pred, colour = "Reg. LR Total Trips", group=1)) + 
+  scale_color_manual(name = "Test vs Predictions", values = c("Test Total Trips" = 2, "Reg. LR Total Trips" = 3))
+ggp
+
+cat("Train RMSE for glmnet", mean(glmnet.mod$results$RMSE))
+cat("Test RMSE for glmnet", sqrt(mean((glmnet.pred - test$totalTrips)^2)))
+```
+
+***Regression Tree***
+
+```{r}
+rpart.mod <- train(totalTrips ~ temp + totalCrimes + humidity + windspeed + visibility + feelslike + uvindex,
+              data = train,
+              method = "rpart",
+              trControl = myTimeControl,
+              tuneLength=tuneLength.num,
+              metric='RMSE'
+                )
+summary(rpart.mod)
+plot(rpart.mod)
+rpart.mod
+```
+
+***Testing the model (Testing Regression Tree) and plotting it's results over here.***
+
+```{r}
+library(rpart)
+library(rpart.plot)
+
+plot(rpart.mod)
+
+rpart.mod
+rpart.pred = predict(rf.mod, newx)
+length(rpart.pred)
+rpart.pred
+
+ggp = ggplot(data = test) + 
+  geom_line(aes(x = date, y = totalTrips, colour = "Test Total Trips", group = 1)) +
+  geom_line(aes(x = date, y = glmnet.pred, colour = "Reg. LR Total Trips", group=1)) +
+  geom_line(aes(x = date, y = rpart.pred, colour = "Regression Tree Total Trips", group = 1)) + 
+  scale_color_manual(name = "Test vs Predictions", values = c("Test Total Trips" = 2, "Reg. LR Total Trips" = 3, "Regression Tree Total Trips" = 4))
+ggp
+
+cat("Train RMSE for glmnet", mean(rpart.mod$results$RMSE))
+cat("Test RMSE for glmnet", sqrt(mean((rpart.pred - test$totalTrips)^2)))
+```
+
+*Training the Gam Model.*
+
+```{r}
+library(mgcv)
+gam.mod <- train(totalTrips ~ temp + totalCrimes + humidity + windspeed + visibility + feelslike + uvindex,
+                   data = train,
+                   method = "gam",
+                   trControl = myTimeControl,
+                   tuneLength=tuneLength.num,
+                   metric='RMSE'
+                 )
+
+plot(gam.mod)
+gam.mod
+```
+***Testing the model (Gam) and plotting it's results over here.***
+
+```{r}
+gam.pred = predict(gam.mod, newx)
+dim(gam.pred)
+gam.pred
+
+ggp = ggplot(data = test) + 
+  geom_line(aes(x = date, y = totalTrips, colour = "Test Total Trips", group=1)) +
+  geom_line(aes(x = date, y = glmnet.pred, colour = "Reg. LR Total Trips", group=1)) +
+  geom_line(aes(x = date, y = gam.pred, colour = "Gam Total Trips", group=1)) + 
+  scale_color_manual(name = "Test vs Predictions", values = c("Test Total Trips" = 2, "Reg. LR Total Trips" = 3, "Gam Total Trips" = 4))
+ggp
+
+cat("Train RMSE for glmnet", mean(gam.mod$results$RMSE))
+cat("Test RMSE for glmnet", sqrt(mean((gam.pred - test$totalTrips)^2)))
+```
+
+
+\_\* Comparing the models over here.\*\_
+
+```{r}
+# resamps <- resamples(list(glmnet = glmnet.mod, glmnet.pois = pois.mod, gam=gam.mod))
+resamps <- resamples(list(glmnet = glmnet.mod, gam=gam.mod, rpart=rpart.mod))
+ss <- summary(resamps)
+knitr::kable(ss[[3]]$RMSE)
+```
+
+```{r}
+trellis.par.set(caretTheme())
+dotplot(resamps, metric = "RMSE")
+```
